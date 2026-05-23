@@ -7,22 +7,6 @@ on:
     branches: [main]
 
 jobs:
-  test-backend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
-      - name: Install deps
-        run: pip install -r backend/requirements-dev.txt
-      - name: Run tests
-        run: |
-          cd backend
-          pytest tests/ -v --cov=app --cov=simple_classify \
-                 --cov-report=xml --cov-report=term
-      - uses: codecov/codecov-action@v4
-        with: { token: ${{ secrets.CODECOV_TOKEN }} }
-
   test-frontend:
     runs-on: ubuntu-latest
     steps:
@@ -33,18 +17,29 @@ jobs:
       - run: cd frontend && npm run type-check
       - run: cd frontend && npm run build
 
+  lint-hf-space:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: Syntax check
+        run: |
+          python -m py_compile hf_space/app.py
+          python -m py_compile hf_space/simple_classify.py
+
   deploy-hf-space:
-    needs: [test-backend]
+    needs: [test-frontend, lint-hf-space]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Push hf_space/ to HuggingFace Space
         run: |
-          git config user.email "ci@github.com"
-          git config user.name "GitHub CI"
+          git config --global user.email "ci@github.com"
+          git config --global user.name "GitHub CI"
           cd hf_space
-          git init
+          git init -b main
           git remote add hf https://user:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/${{ secrets.HF_SPACE_ID }}
           git add .
           git commit -m "deploy: ${{ github.sha }}"

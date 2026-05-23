@@ -1,7 +1,6 @@
-version: "3.9"
-
-volumes:
-  uploads:
+# Local development stack — runs the same code that production uses.
+# Production: frontend → Vercel, hf_space → HuggingFace Space, Redis → Upstash.
+# Locally we replace Vercel/HF/Upstash with Docker containers but the apps themselves are identical.
 
 services:
   redis:
@@ -14,32 +13,21 @@ services:
       timeout: 3s
       retries: 5
 
-  backend:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-    environment:
-      REDIS_URL: redis://redis:6379/0
-      UPLOADS_DIR: /uploads
-    ports:
-      - "8000:8000"
-    volumes:
-      - uploads:/uploads
-    depends_on:
-      redis:
-        condition: service_healthy
-
   worker:
     build:
-      context: ./ml_worker
+      context: ./hf_space
       dockerfile: Dockerfile
     environment:
       REDIS_URL: redis://redis:6379/0
-      MODEL_PATH: /app/model.pkl
-      UPLOADS_DIR: /uploads
+      HF_MODEL_REPO: PetroBodruh/grp-model
+      # HF_TOKEN: <only if model repo is private>
+      ALLOWED_ORIGINS: "http://localhost:5173"
+    ports:
+      - "7860:7860"
     volumes:
-      - ./ml_worker:/app
-      - uploads:/uploads
+      - ./hf_space:/app                       # live code reload
+      - torch-cache:/app/.cache/torch         # keep pre-downloaded htdemucs_6s
+      - hf-cache:/root/.cache/huggingface     # keep downloaded model.pkl
     depends_on:
       redis:
         condition: service_healthy
@@ -50,7 +38,11 @@ services:
     volumes:
       - ./frontend:/app
     environment:
-      VITE_API_URL: http://localhost:8000
+      VITE_API_URL: http://localhost:7860
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
     ports:
       - "5173:5173"
+
+volumes:
+  torch-cache:
+  hf-cache:
