@@ -1,0 +1,84 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+    expose:
+      - "6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      UPLOADS_DIR: /uploads
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+    expose:
+      - "8000"
+    volumes:
+      - uploads:/uploads
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ./ml_worker
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      MODEL_PATH: /app/model.pkl
+      UPLOADS_DIR: /uploads
+    volumes:
+      - uploads:/uploads
+      - demucs-cache:/app/_demucs_cache
+      - beats-cache:/app/_beats_cache
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
+    restart: unless-stopped
+    expose:
+      - "80"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  redis-data:
+  uploads:
+  demucs-cache:
+  beats-cache:
+  caddy-data:
+  caddy-config:
