@@ -5,22 +5,46 @@ on:
     - cron: '0 * * * *'   # щогодини
   workflow_dispatch:        # запуск вручну з UI
 
+env:
+  HF_SPACE_URL: https://petrobodruh-gpr-worker.hf.space
+
 jobs:
   snapshot:
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch /metrics from HF Space
+      - name: Wake up HF Space (may be sleeping)
         run: |
-          curl -s --max-time 60 \
-            https://petrobodruh-gpr-worker.hf.space/metrics \
-            -o metrics.txt
+          echo "Pinging Space to wake it up (cold start can take 60s)…"
+          # -L follows redirects, -f returns non-zero on HTTP errors,
+          # -m 180 gives the Space time to wake.
+          curl -sLfm 180 "$HF_SPACE_URL/" -o /dev/null \
+            && echo "✓ Space is awake" \
+            || echo "⚠ Wake-up call failed (continuing anyway)"
 
-          if [ ! -s metrics.txt ]; then
-            echo "❌ Failed to fetch metrics (file empty or curl error)" >> $GITHUB_STEP_SUMMARY
-            exit 1
-          fi
+      - name: Fetch /metrics with retry
+        id: fetch
+        run: |
+          set +e
+          for attempt in 1 2 3; do
+            echo "Attempt $attempt: fetching metrics…"
+            HTTP_CODE=$(curl -sLm 60 -w "%{http_code}" \
+              "$HF_SPACE_URL/metrics" -o metrics.txt)
+            if [ "$HTTP_CODE" = "200" ] && [ -s metrics.txt ]; then
+              echo "✓ Got $(wc -c < metrics.txt) bytes (HTTP $HTTP_CODE)"
+              exit 0
+            fi
+            echo "  HTTP $HTTP_CODE, file size $(wc -c < metrics.txt 2>/dev/null || echo 0)"
+            sleep 15
+          done
+          echo "❌ Failed after 3 attempts" >> $GITHUB_STEP_SUMMARY
+          echo '<details><summary>Last response body</summary>' >> $GITHUB_STEP_SUMMARY
+          echo '<pre>' >> $GITHUB_STEP_SUMMARY
+          head -c 2000 metrics.txt >> $GITHUB_STEP_SUMMARY 2>/dev/null
+          echo '</pre></details>' >> $GITHUB_STEP_SUMMARY
+          exit 1
 
       - name: Build summary
+        if: success()
         run: |
           echo "## 🎸 GPR metrics — $(date -u +'%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -30,9 +54,19 @@ jobs:
           grep -E '^gpr_predictions_total\{' metrics.txt | sort >> $GITHUB_STEP_SUMMARY || echo "(no data yet)" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
-          echo "### Stage durations (counts)" >> $GITHUB_STEP_SUMMARY
+          echo "### Inference duration (counts per bucket)" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          grep -E '^gpr_stage_duration_seconds_count\{' metrics.txt | sort >> $GITHUB_STEP_SUMMARY || true
+          grep -E '^gpr_inference_duration_seconds_count' metrics.txt | sort >> $GITHUB_STEP_SUMMARY || echo "(no data yet)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          echo "### Stage durations (sum sec)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -E '^gpr_stage_duration_seconds_sum' metrics.txt | sort >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          echo "### Confidence distribution" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -E '^gpr_inference_confidence_(sum|count)' metrics.txt | sort >> $GITHUB_STEP_SUMMARY || true
           echo '```' >> $GITHUB_STEP_SUMMARY
 
           echo "### User feedback" >> $GITHUB_STEP_SUMMARY
@@ -40,7 +74,9 @@ jobs:
           grep -E '^gpr_user_feedback_total\{' metrics.txt | sort >> $GITHUB_STEP_SUMMARY || echo "(no feedback yet)" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload raw metrics
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: metrics-${{ github.run_id }}
           path: metrics.txt
