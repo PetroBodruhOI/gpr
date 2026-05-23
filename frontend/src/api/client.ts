@@ -50,6 +50,11 @@ export async function getTask(taskId: string): Promise<TaskStatus> {
   return data;
 }
 
+export async function submitFeedback(taskId: string,
+                                     rating: "good" | "bad"): Promise<void> {
+  await api.post(`/feedback/${taskId}`, { rating });
+}
+
 /** Polling кожні 1.5 сек, поки статус не done/error. */
 export async function pollTask(
   taskId: string,

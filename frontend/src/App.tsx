@@ -124,7 +124,7 @@ export default function App() {
 
             {/* Result */}
             {task?.status === "done" && task.result && (
-              <ResultCard result={task.result} />
+              <ResultCard result={task.result} taskId={task.task_id} />
             )}
 
             {/* Errors */}

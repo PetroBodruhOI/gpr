@@ -1,0 +1,47 @@
+name: Metrics snapshot
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # щогодини
+  workflow_dispatch:        # запуск вручну з UI
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch /metrics from HF Space
+        run: |
+          curl -s --max-time 60 \
+            https://petrobodruh-gpr-worker.hf.space/metrics \
+            -o metrics.txt
+
+          if [ ! -s metrics.txt ]; then
+            echo "❌ Failed to fetch metrics (file empty or curl error)" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+      - name: Build summary
+        run: |
+          echo "## 🎸 GPR metrics — $(date -u +'%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Predictions by class" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -E '^gpr_predictions_total\{' metrics.txt | sort >> $GITHUB_STEP_SUMMARY || echo "(no data yet)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          echo "### Stage durations (counts)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -E '^gpr_stage_duration_seconds_count\{' metrics.txt | sort >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          echo "### User feedback" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          grep -E '^gpr_user_feedback_total\{' metrics.txt | sort >> $GITHUB_STEP_SUMMARY || echo "(no feedback yet)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: metrics-${{ github.run_id }}
+          path: metrics.txt
+          retention-days: 90
