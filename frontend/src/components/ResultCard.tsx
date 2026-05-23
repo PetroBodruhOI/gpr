@@ -1,10 +1,75 @@
-import { PredictResult } from "../api/client";
+import { useState } from "react";
+import { PredictResult, submitFeedback } from "../api/client";
 import { PATTERNS } from "../data/patterns";
 import PatternDisplay, { PatternLegend } from "./PatternDisplay";
 import ChunkDistributionChart from "./ChunkDistributionChart";
 
 interface Props {
   result: PredictResult;
+  taskId: string;
+}
+
+function FeedbackPanel({ taskId }: { taskId: string }) {
+  const [submitted, setSubmitted] = useState<"good" | "bad" | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const send = async (rating: "good" | "bad") => {
+    if (busy || submitted) return;
+    setBusy(true);
+    try {
+      await submitFeedback(taskId, rating);
+      setSubmitted(rating);
+    } catch (e) {
+      console.error("feedback failed", e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (submitted) {
+    return (
+      <div className="card mt-6 flex items-center justify-center gap-2 text-emerald-300">
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+        </svg>
+        <span className="text-sm">Дякую за фідбек!</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card mt-6">
+      <p className="text-white/70 text-sm mb-3 text-center">
+        Чи правильна рекомендація?
+      </p>
+      <div className="flex gap-3 justify-center">
+        <button
+          onClick={() => send("good")}
+          disabled={busy}
+          className="px-5 py-2 rounded-lg font-medium transition-all duration-200 disabled:opacity-50"
+          style={{
+            background: "rgba(16, 185, 129, 0.15)",
+            border: "1px solid rgba(16, 185, 129, 0.4)",
+            color: "#6ee7b7",
+          }}
+        >
+          👍 Так, підходить
+        </button>
+        <button
+          onClick={() => send("bad")}
+          disabled={busy}
+          className="px-5 py-2 rounded-lg font-medium transition-all duration-200 disabled:opacity-50"
+          style={{
+            background: "rgba(239, 68, 68, 0.12)",
+            border: "1px solid rgba(239, 68, 68, 0.4)",
+            color: "#fca5a5",
+          }}
+        >
+          👎 Ні, не те
+        </button>
+      </div>
+    </div>
+  );
 }
 
 const HIGH_CONFIDENCE_THRESHOLD = 0.75;     // 75%
@@ -84,7 +149,7 @@ function PatternCard({
   );
 }
 
-export default function ResultCard({ result }: Props) {
+export default function ResultCard({ result, taskId }: Props) {
   const recommendations = pickRecommendations(result.mean_probs);
   const isHighConf = result.final_conf >= HIGH_CONFIDENCE_THRESHOLD;
 
@@ -172,6 +237,8 @@ export default function ResultCard({ result }: Props) {
           </table>
         </div>
       </div>
+
+      <FeedbackPanel taskId={taskId} />
     </div>
   );
 }
