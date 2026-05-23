@@ -28,8 +28,34 @@ jobs:
           python -m py_compile hf_space/app.py
           python -m py_compile hf_space/simple_classify.py
 
+  test-hf-space:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+          cache-dependency-path: hf_space/requirements-dev.txt
+
+      # System deps that some pip packages need
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Install Python deps
+        working-directory: hf_space
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run pytest
+        working-directory: hf_space
+        env:
+          REDIS_URL: redis://localhost:6379/0
+        run: pytest test_app.py -v --tb=short
+
   deploy-hf-space:
-    needs: [test-frontend, lint-hf-space]
+    needs: [test-frontend, lint-hf-space, test-hf-space]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:

@@ -352,7 +352,7 @@ async def predict_file(file: UploadFile, bg: BackgroundTasks):
     _set_progress(task_id, 0, "Queued", status="pending")
     bg.add_task(run_predict, task_id, audio_path=tmp_path, cleanup_dir=tmp_dir)
     logger.info("predict_file_queued",
-                extra={"task_id": task_id, "filename": filename})
+                extra={"task_id": task_id, "file_name": filename})
     return {"task_id": task_id}
 
 
