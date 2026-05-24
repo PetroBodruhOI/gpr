@@ -31,3 +31,4 @@ Thumbs.db
 *.wav
 *.mp3
 /tmp/
+.claude/
