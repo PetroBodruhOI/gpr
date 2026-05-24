@@ -1042,10 +1042,6 @@ def _download_audio_ytdlp(url: str, tmp_path: str, start_sec=None, duration_sec=
 
     if mode == "python":
         import yt_dlp
-        pp_opts = {}
-        if pp_args:
-            pp_opts = {"preferredcodec": "wav",
-                       "preferredquality": "0"}
 
         ydl_opts = {
             "format":            "bestaudio/best",
@@ -1057,11 +1053,14 @@ def _download_audio_ytdlp(url: str, tmp_path: str, start_sec=None, duration_sec=
             "quiet":             True,
             "no_warnings":       True,
         }
-        if pp_args:
-            ydl_opts["postprocessor_args"] = {
-                "ffmpeg": ["-ss", str(start_sec or 0)] +
-                          (["-t", str(duration_sec)] if duration_sec else [])
-            }
+
+        # ЗАВЖДИ додаємо -ar 16000 для сумісності з натренованою моделлю
+        ffmpeg_args = ["-ar", "16000"]
+        if start_sec is not None:
+            ffmpeg_args += ["-ss", str(start_sec)]
+        if duration_sec is not None:
+            ffmpeg_args += ["-t", str(duration_sec)]
+        ydl_opts["postprocessor_args"] = {"ffmpeg": ffmpeg_args}
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -1090,8 +1089,9 @@ def _download_audio_ytdlp(url: str, tmp_path: str, start_sec=None, duration_sec=
             "-o", tmp_path.replace(".wav", ".%(ext)s"),
             "--quiet",
         ]
-        if pp_args:
-            dl_cmd += ["--postprocessor-args", f"ffmpeg:{' '.join(pp_args)}"]
+        # ЗАВЖДИ додаємо -ar 16000 для сумісності з натренованою моделлю
+        ffmpeg_pp = ["-ar", "16000"] + pp_args
+        dl_cmd += ["--postprocessor-args", f"ffmpeg:{' '.join(ffmpeg_pp)}"]
         dl_cmd.append(url)
 
         result = subprocess.run(
