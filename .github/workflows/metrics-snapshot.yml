@@ -7,6 +7,7 @@ on:
 
 env:
   HF_SPACE_URL: https://petrobodruh-gpr-worker.hf.space
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   snapshot:
@@ -43,36 +44,138 @@ jobs:
           echo '</pre></details>' >> $GITHUB_STEP_SUMMARY
           exit 1
 
-      - name: Build summary
+      - uses: actions/setup-python@v5
+        if: success()
+        with:
+          python-version: "3.11"
+
+      - name: Build summary (parsed tables)
         if: success()
         run: |
-          echo "## 🎸 GPR metrics — $(date -u +'%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          pip install prometheus-client --quiet
+          python <<'PY' >> $GITHUB_STEP_SUMMARY
+          from prometheus_client.parser import text_string_to_metric_families
+          from collections import defaultdict
+          from datetime import datetime, timezone
 
-          echo "### Predictions by class" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          grep -E '^gpr_predictions_total\{' metrics.txt | sort >> $GITHUB_STEP_SUMMARY || echo "(no data yet)" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          with open("metrics.txt") as f:
+              families = list(text_string_to_metric_families(f.read()))
 
-          echo "### Inference duration (counts per bucket)" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          grep -E '^gpr_inference_duration_seconds_count' metrics.txt | sort >> $GITHUB_STEP_SUMMARY || echo "(no data yet)" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          print(f"## 🎸 GPR Stats — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}\n")
 
-          echo "### Stage durations (sum sec)" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          grep -E '^gpr_stage_duration_seconds_sum' metrics.txt | sort >> $GITHUB_STEP_SUMMARY || true
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          # ── Predictions ──
+          rows = []
+          for fam in families:
+              if fam.name == "gpr_predictions_total":
+                  for s in fam.samples:
+                      if s.name == "gpr_predictions_total":
+                          rows.append((s.labels.get("predicted_class", "?"),
+                                       s.labels.get("source", "?"),
+                                       s.labels.get("status", "?"),
+                                       int(s.value)))
+          if rows:
+              total = sum(r[3] for r in rows)
+              print(f"### 📊 Predictions (total: **{total}**)")
+              print("| Class | Source | Status | Count |")
+              print("|-------|--------|--------|-------|")
+              for cls, src, st, cnt in sorted(rows):
+                  print(f"| `{cls}` | {src} | {st} | {cnt} |")
+              print()
 
-          echo "### Confidence distribution" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          grep -E '^gpr_inference_confidence_(sum|count)' metrics.txt | sort >> $GITHUB_STEP_SUMMARY || true
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          # ── Helper: extract _sum and _count for histograms ──
+          def hist_agg(family_name, group_by_labels):
+              counts, sums = defaultdict(float), defaultdict(float)
+              for fam in families:
+                  if fam.name != family_name:
+                      continue
+                  for s in fam.samples:
+                      key = tuple(s.labels.get(l, "?") for l in group_by_labels)
+                      if s.name.endswith("_count"):
+                          counts[key] = s.value
+                      elif s.name.endswith("_sum"):
+                          sums[key] = s.value
+              return counts, sums
 
-          echo "### User feedback" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          grep -E '^gpr_user_feedback_total\{' metrics.txt | sort >> $GITHUB_STEP_SUMMARY || echo "(no feedback yet)" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          # ── Pipeline stages ──
+          counts, sums = hist_agg("gpr_stage_duration_seconds", ["stage"])
+          if counts:
+              print("### ⚙️ Pipeline performance")
+              print("| Stage | Calls | Total sec | Avg sec |")
+              print("|-------|-------|-----------|---------|")
+              order = ["download", "demucs", "beat", "classify"]
+              for stage in order:
+                  key = (stage,)
+                  if key in counts:
+                      cnt = counts[key]
+                      avg = sums[key] / cnt if cnt else 0
+                      print(f"| `{stage}` | {int(cnt)} | {sums[key]:.1f} | {avg:.1f} |")
+              print()
+
+          # ── Inference duration (per class) ──
+          counts, sums = hist_agg("gpr_inference_duration_seconds",
+                                  ["predicted_class", "source"])
+          if counts:
+              print("### ⏱️ End-to-end inference time")
+              print("| Class | Source | Calls | Avg sec |")
+              print("|-------|--------|-------|---------|")
+              for key in sorted(counts.keys()):
+                  cnt = counts[key]
+                  avg = sums[key] / cnt if cnt else 0
+                  print(f"| `{key[0]}` | {key[1]} | {int(cnt)} | {avg:.1f} |")
+              print()
+
+          # ── Audio duration ──
+          counts, sums = hist_agg("gpr_audio_duration_seconds", ["source"])
+          if counts:
+              print("### 🎵 Audio length")
+              print("| Source | Tracks | Avg seconds |")
+              print("|--------|--------|-------------|")
+              for key in sorted(counts.keys()):
+                  cnt = counts[key]
+                  avg = sums[key] / cnt if cnt else 0
+                  print(f"| {key[0]} | {int(cnt)} | {avg:.1f} |")
+              print()
+
+          # ── Confidence ──
+          counts, sums = hist_agg("gpr_inference_confidence", ["predicted_class"])
+          if counts:
+              print("### 🎯 Average confidence")
+              print("| Class | Predictions | Avg confidence |")
+              print("|-------|-------------|----------------|")
+              for key in sorted(counts.keys()):
+                  cnt = counts[key]
+                  avg = sums[key] / cnt if cnt else 0
+                  print(f"| `{key[0]}` | {int(cnt)} | **{avg * 100:.1f}%** |")
+              print()
+
+          # ── User feedback ──
+          agg = defaultdict(lambda: {"good": 0, "bad": 0})
+          for fam in families:
+              if fam.name == "gpr_user_feedback_total":
+                  for s in fam.samples:
+                      if s.name == "gpr_user_feedback_total":
+                          cls = s.labels.get("predicted_class", "?")
+                          r = s.labels.get("rating", "?")
+                          if r in ("good", "bad"):
+                              agg[cls][r] = s.value
+          if agg:
+              total_g = sum(v["good"] for v in agg.values())
+              total_b = sum(v["bad"] for v in agg.values())
+              overall = total_g / (total_g + total_b) * 100 if (total_g + total_b) else 0
+              print(f"### 👍/👎 User feedback (satisfaction: **{overall:.0f}%**)")
+              print("| Class | 👍 Good | 👎 Bad | Score |")
+              print("|-------|---------|--------|-------|")
+              for cls in sorted(agg.keys()):
+                  g = int(agg[cls]["good"]); b = int(agg[cls]["bad"])
+                  score = f"{g/(g+b)*100:.0f}%" if (g+b) else "—"
+                  print(f"| `{cls}` | {g} | {b} | {score} |")
+              print()
+
+          import os
+          run_id = os.environ.get("GITHUB_RUN_ID", "?")
+          print("\n---")
+          print(f"_Raw metrics file: see Artifacts → `metrics-{run_id}` (90 days retention)._")
+          PY
 
       - name: Upload raw metrics
         if: always()
