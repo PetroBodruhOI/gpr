@@ -28,21 +28,27 @@ function FeedbackPanel({ taskId }: { taskId: string }) {
 
   if (submitted) {
     return (
-      <div className="card mt-6 flex items-center justify-center gap-2 text-emerald-300">
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-        </svg>
-        <span className="text-sm">Дякую за фідбек!</span>
+      <div className="card mt-6 text-center">
+        <div className="flex items-center justify-center gap-2 text-emerald-300 mb-1">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+          </svg>
+          <span className="text-sm font-semibold">Дякуємо за відгук!</span>
+        </div>
+        <p className="text-white/50 text-xs">Ваша оцінка допомагає нам покращити модель.</p>
       </div>
     );
   }
 
   return (
-    <div className="card mt-6">
-      <p className="text-white/70 text-sm mb-3 text-center">
-        Чи правильна рекомендація?
+    <div className="card mt-6 text-center">
+      <h3 className="text-white font-semibold text-base mb-1">
+        Допоможіть нам покращити модель
+      </h3>
+      <p className="text-white/60 text-sm mb-4">
+        Чи вважаєте, що рекомендація була правильною?
       </p>
-      <div className="flex gap-3 justify-center">
+      <div className="flex gap-3 justify-center flex-wrap">
         <button
           onClick={() => send("good")}
           disabled={busy}
@@ -68,6 +74,100 @@ function FeedbackPanel({ taskId }: { taskId: string }) {
           👎 Ні, не те
         </button>
       </div>
+    </div>
+  );
+}
+
+const TIMELINE_PREVIEW_COUNT = 2;
+
+function TimelineTable({
+  chunks,
+  total,
+}: {
+  chunks: PredictResult["chunks"];
+  total: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const canCollapse = chunks.length > TIMELINE_PREVIEW_COUNT;
+  const visible = expanded || !canCollapse
+    ? chunks
+    : chunks.slice(0, TIMELINE_PREVIEW_COUNT);
+  const hiddenCount = chunks.length - TIMELINE_PREVIEW_COUNT;
+
+  return (
+    <div className="card">
+      <h3 className="text-lg font-semibold text-white mb-5 flex items-center gap-2">
+        <span className="w-1 h-5 bg-emerald-500 rounded-full" />
+        Часова шкала
+        <span className="text-white/40 text-sm font-normal ml-2">
+          {total} сегментів
+        </span>
+      </h3>
+      <div className="overflow-x-auto rounded-lg border border-white/5">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-slate-900/40 border-b border-white/5">
+              <th className="px-4 py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">#</th>
+              <th className="px-4 py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">Час</th>
+              <th className="px-4 py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">Патерн</th>
+              <th className="px-4 py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">Впевн.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((c) => (
+              <tr
+                key={c.chunk_idx}
+                className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
+              >
+                <td className="px-4 py-3 text-white/40 font-mono">{c.chunk_idx}</td>
+                <td className="px-4 py-3 text-white/70 font-mono">
+                  {c.time_start.toFixed(1)}с – {c.time_end.toFixed(1)}с
+                </td>
+                <td className="px-4 py-3 font-medium text-white">{c.label}</td>
+                <td className="px-4 py-3">
+                  <span className="inline-block px-2.5 py-1 rounded-md text-xs font-semibold"
+                        style={{
+                          background: "rgba(234, 179, 8, 0.12)",
+                          color: "#fde047",
+                          border: "1px solid rgba(234, 179, 8, 0.25)"
+                        }}>
+                    {(c.confidence * 100).toFixed(1)}%
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {canCollapse && (
+        <div className="mt-4 flex justify-center">
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="px-4 py-2 rounded-lg text-sm font-medium text-white/70 hover:text-white transition-all duration-200 flex items-center gap-2"
+            style={{
+              background: "rgba(255, 255, 255, 0.04)",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+            }}
+          >
+            {expanded ? (
+              <>
+                Показати менше
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                </svg>
+              </>
+            ) : (
+              <>
+                Показати більше ({hiddenCount})
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </>
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -192,51 +292,7 @@ export default function ResultCard({ result, taskId }: Props) {
       <ChunkDistributionChart chunks={result.chunks} />
 
       {/* Timeline table */}
-      <div className="card">
-        <h3 className="text-lg font-semibold text-white mb-5 flex items-center gap-2">
-          <span className="w-1 h-5 bg-emerald-500 rounded-full" />
-          Часова шкала
-          <span className="text-white/40 text-sm font-normal ml-2">
-            {result.n_chunks} сегментів
-          </span>
-        </h3>
-        <div className="overflow-x-auto rounded-lg border border-white/5">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-900/40 border-b border-white/5">
-                <th className="px-4 py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">#</th>
-                <th className="px-4 py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">Час</th>
-                <th className="px-4 py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">Патерн</th>
-                <th className="px-4 py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">Впевн.</th>
-              </tr>
-            </thead>
-            <tbody>
-              {result.chunks.map((c) => (
-                <tr
-                  key={c.chunk_idx}
-                  className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
-                >
-                  <td className="px-4 py-3 text-white/40 font-mono">{c.chunk_idx}</td>
-                  <td className="px-4 py-3 text-white/70 font-mono">
-                    {c.time_start.toFixed(1)}s – {c.time_end.toFixed(1)}s
-                  </td>
-                  <td className="px-4 py-3 font-medium text-white">{c.label}</td>
-                  <td className="px-4 py-3">
-                    <span className="inline-block px-2.5 py-1 rounded-md text-xs font-semibold"
-                          style={{
-                            background: "rgba(234, 179, 8, 0.12)",
-                            color: "#fde047",
-                            border: "1px solid rgba(234, 179, 8, 0.25)"
-                          }}>
-                      {(c.confidence * 100).toFixed(1)}%
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <TimelineTable chunks={result.chunks} total={result.n_chunks} />
 
       <FeedbackPanel taskId={taskId} />
     </div>
