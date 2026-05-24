@@ -467,48 +467,43 @@ def test_nyquist_frequency_matters():
     assert max_freq_22k > max_freq_16k, "22050 Hz should capture higher frequencies"
 
 
-def test_audio_normalization_idempotent():
-    """Normalization: applying twice should give same result."""
-    from simple_classify import _normalize_audio
+def test_load_audio_no_transform():
+    """load_audio must NOT apply any audio transformations (preemphasis, RMS-norm, etc).
+    Model was trained on raw librosa audio — any transform shifts feature distribution
+    and breaks predictions.
+    """
+    from simple_classify import load_audio
+    import tempfile
+    import soundfile as sf
 
-    # Mock audio signal (low quality, variable RMS)
-    y_noisy = np.random.randn(22050) * 0.1  # low SNR
-    sr = 22050
+    # Create predictable audio: sine wave with known RMS
+    sr_test = 22050
+    duration = 1.0
+    t = np.linspace(0, duration, int(sr_test * duration))
+    y_orig = 0.3 * np.sin(2 * np.pi * 440 * t)
+    rms_orig = float(np.sqrt(np.mean(y_orig ** 2)))
 
-    # Normalize once
-    y_norm1 = _normalize_audio(y_noisy.copy(), sr)
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        sf.write(tmp.name, y_orig, sr_test)
+        tmp_path = tmp.name
 
-    # Normalize again
-    y_norm2 = _normalize_audio(y_norm1.copy(), sr)
+    try:
+        y_loaded, sr_out = load_audio(tmp_path, use_demucs=False)
+        rms_loaded = float(np.sqrt(np.mean(y_loaded ** 2)))
 
-    # Second normalization should be stable (RMS already ≈ 0.5)
-    rms1 = np.sqrt(np.mean(y_norm1 ** 2))
-    rms2 = np.sqrt(np.mean(y_norm2 ** 2))
+        # RMS should be preserved (no normalization applied)
+        assert abs(rms_orig - rms_loaded) < 0.01, \
+            f"RMS changed: orig={rms_orig:.4f}, loaded={rms_loaded:.4f} — audio is being transformed!"
+    finally:
+        import os
+        os.unlink(tmp_path)
 
-    # RMS should be similar (within tolerance)
-    assert abs(rms1 - rms2) < 0.05
 
-
-def test_audio_normalization_range():
-    """Normalization: output always in reasonable range."""
-    from simple_classify import _normalize_audio
-
-    test_signals = [
-        np.random.randn(22050) * 0.01,   # very quiet
-        np.random.randn(22050) * 1.0,    # normal
-        np.random.randn(22050) * 5.0,    # very loud
-    ]
-
-    for y in test_signals:
-        y_norm = _normalize_audio(y, 22050)
-
-        # Output should be normalized
-        rms = np.sqrt(np.mean(y_norm ** 2))
-        assert 0.4 < rms < 0.6, f"RMS out of range: {rms}"
-
-        # No NaN or inf
-        assert not np.any(np.isnan(y_norm))
-        assert not np.any(np.isinf(y_norm))
+def test_load_audio_no_normalize_function():
+    """Confirm _normalize_audio is NOT exported (removed to avoid feature drift)."""
+    import simple_classify
+    assert not hasattr(simple_classify, '_normalize_audio'), \
+        "_normalize_audio should not exist — it was removed to prevent breaking predictions"
 
 
 def test_soft_voting_stability_across_quality():
@@ -530,16 +525,16 @@ def test_soft_voting_stability_across_quality():
     assert conf_diff < 0.1
 
 
-# ── Test: 16kHz compatibility (both URL and file) ──────────────────────────
+# ── Test: 22050Hz compatibility (both URL and file) ────────────────────────
 
-def test_load_audio_16khz_default():
-    """Sample rate: load_audio defaults to 16kHz for model compatibility."""
+def test_load_audio_22050hz_default():
+    """Sample rate: load_audio defaults to 22050Hz for model compatibility."""
     from simple_classify import load_audio
     import tempfile
     import soundfile as sf
 
-    # Create a synthetic audio file at 16kHz
-    sr_test = 16000
+    # Create a synthetic audio file at 22050Hz
+    sr_test = 22050
     duration = 1.0
     t = np.linspace(0, duration, int(sr_test * duration))
     y_test = 0.3 * np.sin(2 * np.pi * 440 * t)
@@ -550,36 +545,77 @@ def test_load_audio_16khz_default():
         tmp_path = tmp.name
 
     try:
-        # Load without specifying sr (should default to 16000)
+        # Load without specifying sr (should default to 22050)
         y, sr_out = load_audio(tmp_path, use_demucs=False)
 
-        # Check that sr is 16000
-        assert sr_out == 16000, f"Expected sr=16000, got {sr_out}"
+        # Check that sr is 22050
+        assert sr_out == 22050, f"Expected sr=22050, got {sr_out}"
         assert len(y) == len(y_test), "Audio length mismatch"
     finally:
         import os
         os.unlink(tmp_path)
 
 
-def test_extract_features_16khz():
-    """Features: extract_librosa_features defaults to 16kHz."""
+def test_load_audio_resamples_16khz_to_22050():
+    """load_audio must resample 16kHz file to 22050Hz (yt-dlp downloads at 16kHz)."""
+    from simple_classify import load_audio
+    import tempfile
+    import soundfile as sf
+
+    # Simulate yt-dlp output: WAV at 16kHz
+    sr_in = 16000
+    duration = 1.0
+    t = np.linspace(0, duration, int(sr_in * duration))
+    y_test = 0.3 * np.sin(2 * np.pi * 440 * t)
+
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        sf.write(tmp.name, y_test, sr_in)
+        tmp_path = tmp.name
+
+    try:
+        y, sr_out = load_audio(tmp_path, use_demucs=False)
+        # Must be resampled to 22050
+        assert sr_out == 22050, f"Expected resample to 22050, got {sr_out}"
+        # Length should be ~22050 samples (1 sec @ 22050Hz)
+        assert abs(len(y) - 22050) < 100, f"Expected ~22050 samples, got {len(y)}"
+    finally:
+        import os
+        os.unlink(tmp_path)
+
+
+def test_extract_features_22050hz():
+    """Features: extract_librosa_features defaults to 22050Hz."""
     from simple_classify import extract_librosa_features
 
-    # Synthetic audio
-    sr = 16000
-    y = 0.1 * np.random.randn(sr)  # 1 second of noise at 16kHz
+    # Synthetic audio at 22050Hz
+    sr = 22050
+    y = 0.1 * np.random.randn(sr)  # 1 second of noise
 
-    # Extract features (should use sr=16000 by default)
+    # Extract features (should use sr=22050 by default)
     features = extract_librosa_features(y)
 
-    # Verify features exist
+    # Verify features exist with correct keys
     assert "centroid_mean" in features, f"Expected centroid_mean in features, got: {list(features.keys())}"
     assert "zcr_mean" in features
     assert "rms_mean" in features
+    assert "mfcc_1" in features
 
-    # Spectral centroid should be reasonable for 16kHz (max 8000 Hz)
+    # Spectral centroid should be reasonable for 22050Hz (max ~11025 Hz)
     spec_centroid = features["centroid_mean"]
-    assert 0 < spec_centroid < 8000, f"Spectral centroid out of range for 16kHz: {spec_centroid}"
+    assert 0 < spec_centroid < 11025, f"Spectral centroid out of range for 22050Hz: {spec_centroid}"
+
+
+def test_yt_dlp_uses_16khz():
+    """yt-dlp postprocessor must always include -ar 16000 for URL downloads."""
+    import simple_classify
+    import inspect
+
+    # Get the source of _download_audio_ytdlp
+    source = inspect.getsource(simple_classify._download_audio_ytdlp)
+
+    # Must contain -ar 16000 in both modes (Python and CLI)
+    assert '"-ar", "16000"' in source, \
+        "yt-dlp must include -ar 16000 in ffmpeg postprocessor args"
 
 
 if __name__ == "__main__":
