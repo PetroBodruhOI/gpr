@@ -197,10 +197,11 @@ def run_predict(task_id: str, audio_path: Optional[str] = None,
                 return
 
         # ── 2. Demucs ──
+        # NOTE: Audio is resampled to 16 kHz for model compatibility
         _set_progress(task_id, 30, "Виділяю гітарний стем (HTDemucs)…")
         t_demucs = time.perf_counter()
         try:
-            y, sr = load_audio(audio_path, use_demucs=True)
+            y, sr = load_audio(audio_path, use_demucs=True)  # sr=16000
         except Exception as e:
             _set_progress(task_id, 0, f"Demucs error: {e}", status="error")
             PREDICTIONS_TOTAL.labels(source=source, predicted_class="none",

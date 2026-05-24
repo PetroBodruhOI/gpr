@@ -45,10 +45,12 @@ DEMUCS_CACHE_DIR = "./_demucs_cache"
 _DEMUCS_SEPARATOR = None
 
 
-def separate_guitar(path: str, target_sr: int = 22050):
+def separate_guitar(path: str, target_sr: int = 16000):
     """
     CLI-based Demucs separation (compatible with demucs 4.0.1 from PyPI,
     where demucs.api doesn't yet exist). Calls `python -m demucs -n htdemucs_6s`
+
+    Note: Demucs naturally outputs at 16kHz (for compatibility with trained models)
     and reads the resulting guitar.wav stem from disk.
     """
     import soundfile as sf
@@ -101,10 +103,29 @@ def separate_guitar(path: str, target_sr: int = 22050):
         shutil.rmtree(out_dir, ignore_errors=True)
 
 
-def load_audio(path: str, use_demucs: bool, sr: int = 22050):
+def _normalize_audio(y: np.ndarray, sr: int) -> np.ndarray:
+    """Нормалізує аудіо: HP-фільтр + RMS-норма (стабільність при різній якості)."""
+    # Високочастотний фільтр — видалити басові порушення від стиснення
+    sos = librosa.filters.get_window("hann", 512)
+    y = librosa.effects.preemphasis(y, coef=0.97)
+
+    # RMS-нормалізація (стандартизація гучності)
+    rms = np.sqrt(np.mean(y ** 2))
+    if rms > 1e-6:
+        y = y / rms * 0.5  # нормалізуємо на рівень 0.5
+    return y
+
+
+def load_audio(path: str, use_demucs: bool, sr: int = 16000):
+    """Load audio at target sample rate (16kHz for trained model compatibility)."""
     if use_demucs:
-        return separate_guitar(path, target_sr=sr)
-    return librosa.load(path, sr=sr, mono=True)
+        y, sr_out = separate_guitar(path, target_sr=sr)
+    else:
+        y, sr_out = librosa.load(path, sr=sr, mono=True)
+
+    # Нормалізація для стабільності при URL/файл різноманітності
+    y = _normalize_audio(y, sr_out)
+    return y, sr_out
 
 
 # ─── BeatThis beat tracker ───────────────────────────────────────────────────
@@ -188,7 +209,7 @@ BEAT_KEYS = (
 FEATURE_KEYS = LIBROSA_KEYS + BEAT_KEYS  # 25 + 21 = 46
 
 
-def extract_librosa_features(y: np.ndarray, sr: int = 22050) -> dict:
+def extract_librosa_features(y: np.ndarray, sr: int = 16000) -> dict:
     hop = 256
 
     # Energy
