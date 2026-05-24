@@ -115,18 +115,18 @@ export function PatternLegend({ kind }: { kind: "strum" | "arp" }) {
   if (kind === "strum") {
     return (
       <div className="flex flex-wrap gap-3 text-xs text-white/50">
-        <span><span className="text-yellow-300 font-bold">↓</span> down</span>
-        <span><span className="text-emerald-400 font-bold">↑</span> up</span>
-        <span><span className="text-red-400 font-bold">×</span> mute</span>
-        <span><span className="text-white/30">·</span> rest</span>
+        <span><span className="text-yellow-300 font-bold">↓</span> вниз</span>
+        <span><span className="text-emerald-400 font-bold">↑</span> вгору</span>
+        <span><span className="text-red-400 font-bold">×</span> приглушення</span>
+        <span><span className="text-white/30">·</span> пауза</span>
       </div>
     );
   }
   return (
     <div className="flex flex-wrap gap-3 text-xs text-white/50">
-      <span><span className="text-yellow-300 font-bold">B</span> bass note</span>
-      <span><span className="text-emerald-300 font-bold">1–6</span> string number</span>
-      <span>stacked = chord</span>
+      <span><span className="text-yellow-300 font-bold">B</span> басова нота</span>
+      <span><span className="text-emerald-300 font-bold">1–6</span> номер струни</span>
+      <span>стовпчик = акорд</span>
     </div>
   );
 }

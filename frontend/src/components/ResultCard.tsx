@@ -123,7 +123,7 @@ function PatternCard({
         )}
         <span className="ml-auto flex items-baseline gap-1">
           <span className="text-xl font-semibold text-yellow-300">{pct.toFixed(1)}%</span>
-          <span className="text-white/50 text-sm">relevance</span>
+          <span className="text-white/50 text-sm">релевантність</span>
         </span>
       </div>
 
@@ -142,7 +142,7 @@ function PatternCard({
         </>
       ) : (
         <p className="text-white/40 text-sm italic">
-          Pattern definition not found for "{label}"
+          Опис патерну для «{label}» не знайдено
         </p>
       )}
     </div>
@@ -165,12 +165,12 @@ export default function ResultCard({ result, taskId }: Props) {
           </div>
           <div>
             <h2 className="text-xl font-semibold text-white">
-              {isHighConf ? "Recommended Pattern" : "Possible Patterns"}
+              {isHighConf ? "Рекомендований патерн" : "Можливі патерни"}
             </h2>
             <p className="text-white/50 text-sm">
               {isHighConf
-                ? "Strong match for your track"
-                : `Model is uncertain — showing top ${recommendations.length} candidates`}
+                ? "Найкращий збіг для вашого треку"
+                : `Модель не впевнена — показуємо топ-${recommendations.length} варіантів`}
             </p>
           </div>
         </div>
@@ -195,9 +195,9 @@ export default function ResultCard({ result, taskId }: Props) {
       <div className="card">
         <h3 className="text-lg font-semibold text-white mb-5 flex items-center gap-2">
           <span className="w-1 h-5 bg-emerald-500 rounded-full" />
-          Timeline
+          Часова шкала
           <span className="text-white/40 text-sm font-normal ml-2">
-            {result.n_chunks} segments
+            {result.n_chunks} сегментів
           </span>
         </h3>
         <div className="overflow-x-auto rounded-lg border border-white/5">
@@ -205,9 +205,9 @@ export default function ResultCard({ result, taskId }: Props) {
             <thead>
               <tr className="bg-slate-900/40 border-b border-white/5">
                 <th className="px-4 py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">#</th>
-                <th className="px-4 py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">Time</th>
-                <th className="px-4 py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">Pattern</th>
-                <th className="px-4 py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">Conf</th>
+                <th className="px-4 py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">Час</th>
+                <th className="px-4 py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">Патерн</th>
+                <th className="px-4 py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">Впевн.</th>
               </tr>
             </thead>
             <tbody>

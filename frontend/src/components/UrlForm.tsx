@@ -30,7 +30,7 @@ export default function UrlForm({ onStart }: Props) {
     <div className="space-y-5">
       <div>
         <label className="block text-xs font-semibold text-white/50 mb-2 uppercase tracking-wider">
-          YouTube URL
+          Посилання на YouTube
         </label>
         <input
           type="url"
@@ -45,7 +45,7 @@ export default function UrlForm({ onStart }: Props) {
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-semibold text-white/50 mb-2 uppercase tracking-wider">
-            Start (sec)
+            Початок (сек)
           </label>
           <input
             type="number"
@@ -58,7 +58,7 @@ export default function UrlForm({ onStart }: Props) {
         </div>
         <div>
           <label className="block text-xs font-semibold text-white/50 mb-2 uppercase tracking-wider">
-            Duration (sec)
+            Тривалість (сек)
           </label>
           <input
             type="number"
@@ -81,11 +81,11 @@ export default function UrlForm({ onStart }: Props) {
             <span className="w-1.5 h-1.5 bg-slate-900 rounded-full animate-pulse" />
             <span className="w-1.5 h-1.5 bg-slate-900 rounded-full animate-pulse" style={{ animationDelay: "0.2s" }} />
             <span className="w-1.5 h-1.5 bg-slate-900 rounded-full animate-pulse" style={{ animationDelay: "0.4s" }} />
-            Processing
+            Обробка
           </span>
         ) : (
           <span className="flex items-center justify-center gap-2">
-            Recommend Pattern
+            Підібрати патерн
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 8l4 4m0 0l-4 4m4-4H3" />
             </svg>

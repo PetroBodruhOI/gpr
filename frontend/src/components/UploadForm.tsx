@@ -50,7 +50,7 @@ export default function UploadForm({ onStart }: Props) {
     <div className="space-y-5">
       <div>
         <label className="block text-xs font-semibold text-white/50 mb-2 uppercase tracking-wider">
-          Audio File
+          Аудіофайл
         </label>
         <label
           onDragOver={handleDragOver}
@@ -73,7 +73,7 @@ export default function UploadForm({ onStart }: Props) {
               </svg>
             </div>
             <p className="text-white font-medium mb-1">
-              {dragOver ? "Release to upload" : file ? file.name : "Drop audio file or click to browse"}
+              {dragOver ? "Відпустіть, щоб завантажити" : file ? file.name : "Перетягніть аудіофайл або натисніть, щоб вибрати"}
             </p>
             <p className="text-white/40 text-xs">MP3 · WAV · OGG · FLAC</p>
           </div>
@@ -99,7 +99,7 @@ export default function UploadForm({ onStart }: Props) {
             </svg>
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-green-300 text-sm font-semibold">File ready</p>
+            <p className="text-green-300 text-sm font-semibold">Файл готовий</p>
             <p className="text-white/60 text-sm truncate">{file.name}</p>
           </div>
         </div>
@@ -115,11 +115,11 @@ export default function UploadForm({ onStart }: Props) {
             <span className="w-1.5 h-1.5 bg-slate-900 rounded-full animate-pulse" />
             <span className="w-1.5 h-1.5 bg-slate-900 rounded-full animate-pulse" style={{ animationDelay: "0.2s" }} />
             <span className="w-1.5 h-1.5 bg-slate-900 rounded-full animate-pulse" style={{ animationDelay: "0.4s" }} />
-            Processing
+            Обробка
           </span>
         ) : (
           <span className="flex items-center justify-center gap-2">
-            Recommend Pattern
+            Підібрати патерн
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 8l4 4m0 0l-4 4m4-4H3" />
             </svg>

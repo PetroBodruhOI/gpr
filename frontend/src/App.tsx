@@ -10,7 +10,7 @@ type Mode = "file" | "url";
 type View = "patterns" | "analyze";
 
 export default function App() {
-  const [view, setView] = useState<View>("patterns");
+  const [view, setView] = useState<View>("analyze");
   const [mode, setMode] = useState<Mode>("url");
   const [task, setTask] = useState<TaskStatus | null>(null);
   const [error, setError] = useState<string>("");
@@ -37,14 +37,17 @@ export default function App() {
   };
 
   const navTabClass = (active: boolean) =>
-    `px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
+    `relative px-5 py-3 text-sm md:text-base font-semibold tracking-wide transition-all duration-200 ${
       active
-        ? "bg-blue-900/60 text-white border border-blue-500/30"
-        : "text-white/50 hover:text-white/80"
+        ? "text-white"
+        : "text-white/55 hover:text-white/85"
     }`;
 
   const isTaskRunning = task !== null;
   const isTaskDone = task?.status === "done" || task?.status === "error";
+
+  // Wider container for patterns view so they don't get cramped
+  const containerWidth = view === "patterns" ? "max-w-7xl" : "max-w-4xl";
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -54,20 +57,37 @@ export default function App() {
 
       {/* Top header bar */}
       <header className="relative border-b border-white/5 backdrop-blur-md bg-slate-900/40 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="font-bold text-sm tracking-widest text-yellow-300">GPR</div>
-          <nav className="flex gap-1 p-1 rounded-lg bg-slate-900/60 border border-white/5">
-            <button onClick={() => switchView("patterns")} className={navTabClass(view === "patterns")}>
-              Patterns
+        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
+          <div className="flex items-center gap-3 py-4">
+            <div className="font-bold text-base tracking-widest text-yellow-300">GPR</div>
+            <span className="hidden sm:inline text-white/30 text-xs uppercase tracking-wider">
+              Guitar Pattern Recommender
+            </span>
+          </div>
+          <nav className="flex h-full">
+            <button
+              onClick={() => switchView("analyze")}
+              className={navTabClass(view === "analyze")}
+            >
+              Аналіз
+              {view === "analyze" && (
+                <span className="absolute left-2 right-2 bottom-0 h-0.5 bg-yellow-400 rounded-t-full" />
+              )}
             </button>
-            <button onClick={() => switchView("analyze")} className={navTabClass(view === "analyze")}>
-              Analyze
+            <button
+              onClick={() => switchView("patterns")}
+              className={navTabClass(view === "patterns")}
+            >
+              Список патернів
+              {view === "patterns" && (
+                <span className="absolute left-2 right-2 bottom-0 h-0.5 bg-yellow-400 rounded-t-full" />
+              )}
             </button>
           </nav>
         </div>
       </header>
 
-      <div className="relative max-w-4xl mx-auto py-12 px-4">
+      <div className={`relative ${containerWidth} mx-auto py-12 px-4`}>
         {/* Title block */}
         <div className="mb-10 text-center">
           <h1 className="text-5xl md:text-6xl font-bold text-white mb-5 leading-tight tracking-tight">
@@ -76,10 +96,10 @@ export default function App() {
             <span className="gradient-text">Recommender</span>
           </h1>
           <p className="text-white/60 text-base max-w-xl mx-auto leading-relaxed">
-            There isn't only one correct way to play a piece of music.
+            Не існує єдиного правильного способу зіграти музичний твір.
           </p>
           <p className="text-white/60 text-base max-w-xl mx-auto leading-relaxed">
-            GPR will recommend a pattern that fits your track — or one of the most relevant options.
+            GPR порекомендує патерн, який підійде до вашого треку — або один із найбільш доречних варіантів.
           </p>
         </div>
 
@@ -99,7 +119,7 @@ export default function App() {
                         : "text-white/50 hover:text-white/80"
                     }`}
                   >
-                    YouTube URL
+                    Посилання на YouTube
                   </button>
                   <button
                     onClick={() => setMode("file")}
@@ -109,7 +129,7 @@ export default function App() {
                         : "text-white/50 hover:text-white/80"
                     }`}
                   >
-                    Upload File
+                    Завантажити файл
                   </button>
                 </div>
                 <div className="card mb-6">
@@ -135,7 +155,7 @@ export default function App() {
                     <span className="text-xl">⚠</span>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-red-300">Error</h3>
+                    <h3 className="font-semibold text-red-300">Помилка</h3>
                     <p className="text-white/60 text-sm">{task.message}</p>
                   </div>
                 </div>
@@ -156,7 +176,7 @@ export default function App() {
             {isTaskDone && (
               <div className="mt-6 flex justify-center">
                 <button onClick={resetTask} className="btn-secondary">
-                  ← Analyze another track
+                  ← Аналізувати інший трек
                 </button>
               </div>
             )}

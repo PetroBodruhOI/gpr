@@ -12,7 +12,7 @@ export default function ProgressBar({ progress, message }: Props) {
             <div className="w-9 h-9 rounded-lg bg-emerald-500/15 flex items-center justify-center border border-emerald-500/30">
               <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
             </div>
-            <h3 className="font-medium text-white">Processing</h3>
+            <h3 className="font-medium text-white">Обробка</h3>
           </div>
           <span className="text-xl font-semibold text-yellow-300">{progress}%</span>
         </div>
