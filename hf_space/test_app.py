@@ -389,7 +389,6 @@ def test_many_chunks():
 
 def test_confidence_score_range():
     """Confidence: always in [0, 1]."""
-    classes = ["6a", "6b", "8a", "8b"]
     all_probs = [
         np.array([0.33, 0.33, 0.33, 0.01]),
         np.array([0.34, 0.33, 0.32, 0.01]),
@@ -407,9 +406,7 @@ def test_confidence_score_range():
 
 def test_sample_rate_changes_features():
     """Sample rate: 16 kHz vs 22050 Hz produce DIFFERENT features."""
-    from librosa import load, feature
-    import tempfile
-    import soundfile as sf
+    from librosa import feature
 
     # Create synthetic audio signal (440 Hz sine wave)
     sr_orig = 22050
@@ -438,9 +435,7 @@ def test_sample_rate_changes_features():
 
 def test_nyquist_frequency_matters():
     """Nyquist: 16 kHz loses high frequencies (> 8 kHz) that guitar has."""
-    from librosa import load, feature
-    import scipy
-
+    from librosa import feature
     # Guitar typically has energy up to 10+ kHz
     sr_22k = 22050
     max_freq_22k = sr_22k / 2  # 11025 Hz — can see up to this

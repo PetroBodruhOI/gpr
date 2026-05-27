@@ -8,6 +8,9 @@ simple_classify.py — пайплайн класифікації гітарни�
      для кожного onset рахується STFT-енергія LOW/HIGH → b_low[8], b_high[8].
   5) LightGBM (або будь-яка sklearn-сумісна модель) — навчання на CSV-фічах,
      inference з виводом ймовірностей по кожному chunk.
+  6) Калібрування ймовірностей через soft voting: LightGBM повертає розподіл
+     через predict_proba, а усереднення по чанках пом'якшує переоцінку
+     окремого фрагменту (один шумний chunk не може домінувати у вердикті).
 
 Команди:
   diagnose  — статистика розділення класів (gap, cosine matrix, Fisher ratio)
@@ -54,7 +57,9 @@ def separate_guitar(path: str, target_sr: int = 22050):
     and reads the resulting guitar.wav stem from disk.
     """
     import soundfile as sf
-    import subprocess, tempfile, shutil
+    import subprocess
+    import tempfile
+    import shutil
 
     os.makedirs(DEMUCS_CACHE_DIR, exist_ok=True)
     key = hashlib.md5(
@@ -538,23 +543,35 @@ def cmd_extract(audio_dir, output_csv, max_sec, hop_ratio, use_demucs, use_beats
             print(f"  → {fname:<35} ({label})  {duration:.1f}s → {len(chunks)} chunks")
             for ci, (chunk_y, t_start, t_end) in enumerate(chunks):
                 try:
-                    feat = extract_features(
-                        chunk_y, sr,
-                        beats=beats, downbeats=downbeats,
-                        chunk_offset=t_start,
-                    )
-                    row = {
-                        "file_idx":    file_idx,
-                        "filename":    fname,
-                        "label":       label,
-                        "chunk_idx":   ci,
-                        "chunk_start": round(t_start, 3),
-                        "chunk_end":   round(t_end, 3),
-                    }
-                    for k in FEATURE_KEYS:
-                        row[k] = feat[k]
-                    rows.append(row)
-                    total_chunks += 1
+                    # Audio-level augmentation: each chunk → 3 variants.
+                    # extract_features recomputes all 46 features per variant,
+                    # so the rows are genuinely different (not a label trick).
+                    variants = [
+                        ("orig",  chunk_y),
+                        ("gain",  chunk_y * np.random.uniform(0.8, 1.2)),
+                        ("noise", chunk_y + np.random.normal(
+                            0, 0.005, chunk_y.shape
+                        ).astype(np.float32)),
+                    ]
+                    for aug_tag, y_aug in variants:
+                        feat = extract_features(
+                            y_aug, sr,
+                            beats=beats, downbeats=downbeats,
+                            chunk_offset=t_start,
+                        )
+                        row = {
+                            "file_idx":    file_idx,
+                            "filename":    fname,
+                            "label":       label,
+                            "chunk_idx":   ci,
+                            "chunk_start": round(t_start, 3),
+                            "chunk_end":   round(t_end, 3),
+                            "aug":         aug_tag,
+                        }
+                        for k in FEATURE_KEYS:
+                            row[k] = feat[k]
+                        rows.append(row)
+                        total_chunks += 1
                 except Exception as e:
                     print(f"     chunk {ci+1}: ✗ {e}")
         except Exception as e:
@@ -566,7 +583,7 @@ def cmd_extract(audio_dir, output_csv, max_sec, hop_ratio, use_demucs, use_beats
         return
 
     meta_cols = ["file_idx", "filename", "label",
-                 "chunk_idx", "chunk_start", "chunk_end"]
+                 "chunk_idx", "chunk_start", "chunk_end", "aug"]
     fieldnames = meta_cols + list(FEATURE_KEYS)
 
     with open(output_csv, "w", newline="", encoding="utf-8") as f:
@@ -576,13 +593,14 @@ def cmd_extract(audio_dir, output_csv, max_sec, hop_ratio, use_demucs, use_beats
 
     labels = sorted(set(r["label"] for r in rows))
     label_counts = Counter(r["label"] for r in rows)
+    aug_counts = Counter(r.get("aug", "orig") for r in rows)
     print(f"\n{'═'*55}")
     print(f"  ✅ {output_csv}")
     print(f"  📦 Рядків (chunks)  : {len(rows)}")
     print(f"  📁 Файлів           : {len(files) - len(errors)}/{len(files)}")
     print(f"  🗂  Класи            : {labels}")
-    print(f"  📊 По класах        : "
-          + ", ".join(f"{l}={c}" for l, c in sorted(label_counts.items())))
+    print(f"  📊 По класах        : {', '.join(f'{li}={c}' for li, c in sorted(label_counts.items()))}")  # noqa: E741)
+    print(f"  🔀 Аугментація      : {', '.join(f'{a}={c}' for a, c in sorted(aug_counts.items()))}")
     print(f"  🎯 Фічей            : {len(FEATURE_KEYS)}  "
           f"(librosa: {len(LIBROSA_KEYS)}, beats: {len(BEAT_KEYS)})")
     print(f"  🎸 HTDemucs         : {'ON' if use_demucs else 'OFF'}")
@@ -598,17 +616,63 @@ def cmd_extract(audio_dir, output_csv, max_sec, hop_ratio, use_demucs, use_beats
 
 # ─── NEW: train — навчання LightGBM на CSV ───────────────────────────────────
 
+def _ece_top_label(y_true, y_proba, n_bins=10):
+    """
+    Expected Calibration Error (top-label, multi-class).
+    Розбиває передбачення на bins за максимальною ймовірністю, в кожному
+    bin порівнює середню впевненість моделі з фактичною точністю.
+    0 = ідеально калібровано, > 0.1 — модель «бреше» про впевненість.
+    """
+    confidences = y_proba.max(axis=1)
+    preds       = y_proba.argmax(axis=1)
+    accuracies  = (preds == y_true).astype(float)
+    bin_edges   = np.linspace(0.0, 1.0, n_bins + 1)
+    ece = 0.0
+    n   = len(confidences)
+    for i in range(n_bins):
+        lo, hi = bin_edges[i], bin_edges[i + 1]
+        mask = (confidences > lo) & (confidences <= hi)
+        if mask.sum() == 0:
+            continue
+        avg_conf = confidences[mask].mean()
+        avg_acc  = accuracies[mask].mean()
+        ece += (mask.sum() / n) * abs(avg_conf - avg_acc)
+    return float(ece)
+
+
+def _brier_multiclass(y_true, y_proba):
+    """
+    Multi-class Brier score: середня квадратна відстань predict_proba
+    до one-hot. 0 = ідеально, верхня межа залежить від кількості класів.
+    """
+    onehot = np.zeros_like(y_proba)
+    onehot[np.arange(len(y_true)), y_true] = 1.0
+    return float(np.mean(np.sum((y_proba - onehot) ** 2, axis=1)))
+
+
 def cmd_train(csv_path, output_pkl, n_estimators=500, learning_rate=0.05,
-              num_leaves=63, cv_folds=5):
+              num_leaves=63, cv_folds=5,
+              calibrate=True, calibration_method="isotonic",
+              calibration_cv=3):
     """
     Читає features.csv (з cmd_extract), тренує LightGBM через GroupKFold
     (групи = file_idx, без leakage між chunks одного файла), зберігає model.pkl.
 
+    Калібрування ймовірностей:
+      Якщо calibrate=True (за замовч.) — LightGBM обгортається у
+      CalibratedClassifierCV (isotonic regression на calibration_cv фолдах
+      ВНУТРІШНІЙ CV). LightGBM трохи переоцінює свою впевненість на дереві,
+      isotonic коригує це монотонно на hold-out.
+      Соня вартість: ~calibration_cv× довше навчання.
+      У CV-циклі рахуються Brier + ECE до й після — побачите чи дійсно
+      калібрування покращило ймовірності.
+
     model.pkl містить:
-      pipeline      — sklearn Pipeline (StandardScaler + LGBMClassifier)
+      pipeline      — sklearn Pipeline (StandardScaler + [Calibrated]LGBM)
       classes       — впорядкований список рядкових міток
       feature_keys  — список фіч (порядок колонок)
-      cv_scores     — масив accuracy по фолдах
+      cv_acc, cv_f1 — масиви метрик по фолдах
+      calibration   — {brier_base, brier_cal, ece_base, ece_cal} або None
       config        — параметри навчання
     """
     try:
@@ -616,8 +680,10 @@ def cmd_train(csv_path, output_pkl, n_estimators=500, learning_rate=0.05,
         from sklearn.preprocessing import StandardScaler, LabelEncoder
         from sklearn.pipeline import Pipeline
         from sklearn.impute import SimpleImputer
-        from sklearn.model_selection import GroupKFold, cross_val_score
-        from sklearn.metrics import accuracy_score, f1_score, classification_report
+        from sklearn.model_selection import GroupKFold
+        from sklearn.metrics import accuracy_score, f1_score
+        from sklearn.calibration import CalibratedClassifierCV
+        from sklearn.base import clone
         from lightgbm import LGBMClassifier
     except ImportError as e:
         raise ImportError(
@@ -629,7 +695,7 @@ def cmd_train(csv_path, output_pkl, n_estimators=500, learning_rate=0.05,
     print(f"  Рядків: {len(df)}  |  Колонок: {df.shape[1]}")
 
     META_COLS = ["file_idx", "filename", "label", "chunk_idx",
-                 "chunk_start", "chunk_end"]
+                 "chunk_start", "chunk_end", "aug"]
     feature_keys = [c for c in df.columns if c not in META_COLS]
 
     X = df[feature_keys].values.astype(np.float32)
@@ -642,27 +708,47 @@ def cmd_train(csv_path, output_pkl, n_estimators=500, learning_rate=0.05,
 
     label_counts = Counter(labels_raw)
     print(f"  Класи: {classes}")
-    print(f"  По класах: " + ", ".join(f"{c}={label_counts[c]}" for c in classes))
-    print(f"  Фічей: {len(feature_keys)}\n")
+    print("  По класах: " + ", ".join(f"{c}={label_counts[c]}" for c in classes))
+    print(f"  Фічей: {len(feature_keys)}")
+    print(f"  Калібрування: {'ON (' + calibration_method + f', cv={calibration_cv})' if calibrate else 'OFF'}\n")
 
-    pipeline = Pipeline([
-        ("imputer", SimpleImputer(strategy="median")),
-        ("scaler",  StandardScaler()),
-        ("model",   LGBMClassifier(
+    def _make_base_lgbm():
+        return LGBMClassifier(
             n_estimators=n_estimators,
             learning_rate=learning_rate,
             num_leaves=num_leaves,
             class_weight="balanced",
             random_state=42,
             verbose=-1,
-        )),
-    ])
+        )
+
+    def _make_pipeline(estimator):
+        return Pipeline([
+            ("imputer", SimpleImputer(strategy="median")),
+            ("scaler",  StandardScaler()),
+            ("model",   estimator),
+        ])
+
+    if calibrate:
+        # CalibratedClassifierCV fit'ить base_estimator на (cv-1)/cv даних
+        # і навчає монотонну ізотонічну регресію на залишку. Повторює
+        # calibration_cv разів, потім усереднює.
+        final_estimator = CalibratedClassifierCV(
+            _make_base_lgbm(),
+            method=calibration_method,
+            cv=calibration_cv,
+        )
+    else:
+        final_estimator = _make_base_lgbm()
+
+    pipeline = _make_pipeline(final_estimator)
 
     # ── GroupKFold — chunks одного файла НЕ розділяються між train і val ──
     print(f"[train] GroupKFold CV (k={cv_folds}, groups=file_idx) …")
     gkf = GroupKFold(n_splits=cv_folds)
-    cv_acc  = []
-    cv_f1   = []
+    cv_acc, cv_f1 = [], []
+    brier_base, brier_cal = [], []
+    ece_base,   ece_cal   = [], []
     fold_reports = []
 
     for fold_i, (tr_idx, va_idx) in enumerate(gkf.split(X, y, groups=file_ids)):
@@ -670,13 +756,26 @@ def cmd_train(csv_path, output_pkl, n_estimators=500, learning_rate=0.05,
         X_va, y_va = X[va_idx], y[va_idx]
         file_ids_va = file_ids[va_idx]
 
-        pipeline.fit(X_tr, y_tr)
+        # ── (1) Pipeline для фінального вердикту (calibrated якщо calibrate=True) ──
+        pipe = _make_pipeline(clone(final_estimator))
+        pipe.fit(X_tr, y_tr)
 
-        # ── file-level prediction: голосування chunks ──
+        # ── (2) Базовий некалібрований LGBM — лише для порівняння Brier/ECE ──
+        if calibrate:
+            base_pipe = _make_pipeline(_make_base_lgbm())
+            base_pipe.fit(X_tr, y_tr)
+            p_base = base_pipe.predict_proba(X_va)
+            p_cal  = pipe.predict_proba(X_va)
+            brier_base.append(_brier_multiclass(y_va, p_base))
+            brier_cal .append(_brier_multiclass(y_va, p_cal))
+            ece_base  .append(_ece_top_label(y_va, p_base))
+            ece_cal   .append(_ece_top_label(y_va, p_cal))
+
+        # ── (3) file-level prediction: голосування chunks ──
         file_true, file_pred = [], []
         for fid in np.unique(file_ids_va):
             mask = file_ids_va == fid
-            chunk_preds = pipeline.predict(X_va[mask])
+            chunk_preds = pipe.predict(X_va[mask])
             vote = Counter(chunk_preds).most_common(1)[0][0]
             file_true.append(y_va[mask][0])
             file_pred.append(vote)
@@ -686,17 +785,39 @@ def cmd_train(csv_path, output_pkl, n_estimators=500, learning_rate=0.05,
         cv_acc.append(acc)
         cv_f1.append(f1)
         fold_reports.append((file_true, file_pred))
-        print(f"  fold {fold_i+1}/{cv_folds}  file-acc={acc:.4f}  F1m={f1:.4f}")
 
-    cv_acc  = np.array(cv_acc)
-    cv_f1   = np.array(cv_f1)
+        extra = ""
+        if calibrate:
+            extra = (f"  Brier {brier_base[-1]:.4f}→{brier_cal[-1]:.4f}"
+                     f"  ECE {ece_base[-1]:.4f}→{ece_cal[-1]:.4f}")
+        print(f"  fold {fold_i+1}/{cv_folds}  file-acc={acc:.4f}  F1m={f1:.4f}{extra}")
+
+    cv_acc = np.array(cv_acc)
+    cv_f1  = np.array(cv_f1)
     print(f"\n  CV file-accuracy : {cv_acc.mean():.4f} ± {cv_acc.std():.4f}")
     print(f"  CV F1 macro      : {cv_f1.mean():.4f} ± {cv_f1.std():.4f}")
+
+    calibration_summary = None
+    if calibrate:
+        bb, bc = float(np.mean(brier_base)), float(np.mean(brier_cal))
+        eb, ec = float(np.mean(ece_base)),   float(np.mean(ece_cal))
+        calibration_summary = {
+            "method":     calibration_method,
+            "cv":         calibration_cv,
+            "brier_base": bb, "brier_cal": bc,
+            "ece_base":   eb, "ece_cal":   ec,
+        }
+        print("\n  Калібрування (chunk-level, усереднено по фолдах):")
+        print(f"    Brier score : base={bb:.4f}  →  calibrated={bc:.4f}  "
+              f"(Δ={bb-bc:+.4f})")
+        print(f"    ECE         : base={eb:.4f}  →  calibrated={ec:.4f}  "
+              f"(Δ={eb-ec:+.4f})")
+        print("    (нижче = краще; від'ємна Δ означає що калібрування погіршило)")
 
     # ── Фінальне навчання на ВСІХ даних ──
     print(f"\n[train] Фінальне навчання на всіх {len(X)} chunks …")
     pipeline.fit(X, y)
-    print(f"  ✅ Готово")
+    print("  ✅ Готово")
 
     bundle = {
         "pipeline":     pipeline,
@@ -705,11 +826,15 @@ def cmd_train(csv_path, output_pkl, n_estimators=500, learning_rate=0.05,
         "feature_keys": feature_keys,
         "cv_acc":       cv_acc,
         "cv_f1":        cv_f1,
+        "calibration":  calibration_summary,
         "config": {
             "n_estimators":  n_estimators,
             "learning_rate": learning_rate,
             "num_leaves":    num_leaves,
             "cv_folds":      cv_folds,
+            "calibrate":     calibrate,
+            "calibration_method": calibration_method if calibrate else None,
+            "calibration_cv":     calibration_cv     if calibrate else None,
             "csv_path":      csv_path,
         },
     }
@@ -723,6 +848,9 @@ def cmd_train(csv_path, output_pkl, n_estimators=500, learning_rate=0.05,
     print(f"  🗂  Класи : {classes}")
     print(f"  📊 CV acc : {cv_acc.mean():.4f} ± {cv_acc.std():.4f}")
     print(f"  📊 CV F1m : {cv_f1.mean():.4f} ± {cv_f1.std():.4f}")
+    if calibration_summary:
+        print(f"  🎯 ECE    : {calibration_summary['ece_base']:.4f}"
+              f" → {calibration_summary['ece_cal']:.4f}")
     print(f"{'═'*55}")
 
 
@@ -736,6 +864,12 @@ def cmd_predict(input_path, model_pkl, max_sec, hop_ratio,
       - передбачений клас
       - ймовірності по всіх класах (рядок з N значень)
     Фінальний вердикт = середнє ймовірностей по всіх chunks (soft voting).
+
+    Як калібрування ймовірностей застосовується soft voting: LightGBM
+    повертає розподіл через predict_proba, а усереднення по чанках
+    пом'якшує переоцінку окремого фрагменту. Альтернативний hard voting
+    (більшість chunks) показано для порівняння — він ігнорує впевненість
+    і тому менш надійний на нерівномірних треках.
     """
     try:
         import pandas as pd
@@ -823,7 +957,7 @@ def cmd_predict(input_path, model_pkl, max_sec, hop_ratio,
     hard_winner = vote_counts.most_common(1)[0][0]
     hard_conf   = vote_counts[hard_winner] / n_chunks * 100
 
-    print(f"\n  Soft voting (середнє ймовірностей):")
+    print("\n  Soft voting (середнє ймовірностей):")
     mean_str = "".join(f"{p:>{col_w}.3f}" for p in mean_probs)
     print(f"  {'MEAN':>6}  {'':>12}  {final_label:>6}  {final_conf:>6.3f}  {mean_str}")
 
@@ -836,10 +970,10 @@ def cmd_predict(input_path, model_pkl, max_sec, hop_ratio,
               f"(soft={final_conf:.3f}, hard={hard_conf:.0f}%)")
     else:
         # Soft і hard не збіглись — попереджаємо
-        print(f"  ⚠️  РОЗБІЖНІСТЬ:")
+        print("  ⚠️  РОЗБІЖНІСТЬ:")
         print(f"     Soft voting → '{final_label}'  (p={final_conf:.3f})")
         print(f"     Hard voting → '{hard_winner}'  ({hard_conf:.0f}% chunks)")
-        print(f"     Рекомендація: довіряй soft (враховує впевненість модели)")
+        print("     Рекомендація: довіряй soft (враховує впевненість моделі)")
     print(f"{'═'*55}")
 
     return final_label, mean_probs
@@ -873,7 +1007,8 @@ def cmd_diagnose(audio_dir, use_demucs, use_beats, noise=None):
             print(f"✗ {e}")
 
     if not records:
-        print("[!] Немає даних"); return
+        print("[!] Немає даних")
+        return
 
     raw_arr = np.stack(raw)
     scale   = raw_arr.std(axis=0)
@@ -887,7 +1022,7 @@ def cmd_diagnose(audio_dir, use_demucs, use_beats, noise=None):
     i_m = np.mean(intra) if intra else 0
     e_m = np.mean(inter) if inter else 0
     gap = e_m - i_m
-    print(f"\n📊 Розділення (cosine):")
+    print("\n📊 Розділення (cosine):")
     print(f"   intra={i_m:.4f}  inter={e_m:.4f}  gap={gap:.4f}", end="  ")
     print("✅ ВІДМІННО" if gap > 0.4 else "✅ ДОБРЕ" if gap > 0.15
           else "⚠️  НОРМАЛЬНО" if gap > 0.05 else "❌ СЛАБО")
@@ -935,7 +1070,8 @@ def cmd_build(audio_dir, output, max_sec, hop_ratio, use_demucs, use_beats,
             print(f"  → {fname}: ✗ {e}")
 
     if not records:
-        print("[!] Немає даних"); return
+        print("[!] Немає даних")
+        return
 
     raw_arr = np.stack(raw)
     scale = raw_arr.std(axis=0)
@@ -969,7 +1105,6 @@ def cmd_classify(input_path, db_path, top_k, max_sec, hop_ratio,
     use_beats  = db_use_beats  if use_beats_override  is None else use_beats_override
 
     y, sr = load_audio(input_path, use_demucs=use_demucs)
-    duration = len(y) / sr
     hop_sec = max_sec * hop_ratio
     beats, downbeats = _file_beats(input_path, y, sr, use_beats)
 
@@ -1058,7 +1193,8 @@ def _download_audio_ytdlp(url: str, tmp_path: str, start_sec=None, duration_sec=
         return title, uploader, dur
 
     else:  # CLI
-        import subprocess, json
+        import subprocess
+        import json
         # Спочатку отримуємо метадані (без завантаження)
         meta_cmd = ["yt-dlp", "--dump-json", "--no-playlist", url]
         meta_out = subprocess.run(
@@ -1107,7 +1243,8 @@ def cmd_predict_url(url, model_pkl, max_sec, hop_ratio,
     Юридична позиція: особисте некомерційне використання для аналізу,
     аудіо не зберігається після класифікації.
     """
-    import tempfile, shutil
+    import tempfile
+    import shutil
 
     # Попередження користувачу
     print("─" * 60)
@@ -1127,8 +1264,8 @@ def cmd_predict_url(url, model_pkl, max_sec, hop_ratio,
         print(f"[url] Завантажую аудіо з:\n  {url}\n")
         if start_sec is not None or duration_sec is not None:
             seg = []
-            if start_sec   is not None: seg.append(f"start={start_sec}s")
-            if duration_sec is not None: seg.append(f"duration={duration_sec}s")
+            if start_sec   is not None: seg.append(f"start={start_sec}s")  # noqa: E701
+            if duration_sec is not None: seg.append(f"duration={duration_sec}s")  # noqa: E701
             print(f"  Сегмент: {', '.join(seg)}")
 
         title, uploader, total_dur = _download_audio_ytdlp(
@@ -1161,7 +1298,7 @@ def cmd_predict_url(url, model_pkl, max_sec, hop_ratio,
     finally:
         # ── Гарантоване видалення тимчасових файлів ──
         shutil.rmtree(tmp_dir, ignore_errors=True)
-        print(f"\n  🗑  Тимчасовий файл видалено.")
+        print("\n  🗑  Тимчасовий файл видалено.")
 
 
 # ─── Main ────────────────────────────────────────────────────────────────────
@@ -1218,6 +1355,14 @@ if __name__ == "__main__":
     p.add_argument("--num_leaves",    type=int,   default=63)
     p.add_argument("--cv_folds",      type=int,   default=5,
                    help="К-кість фолдів GroupKFold CV (по file_idx)")
+    p.add_argument("--no_calibrate",  action="store_true",
+                   help="Вимкнути калібрування ймовірностей "
+                        "(швидше тренування, але гірші predict_proba)")
+    p.add_argument("--calibration_method", choices=["isotonic", "sigmoid"],
+                   default="isotonic",
+                   help="isotonic (better для tree-моделей) або sigmoid (Platt)")
+    p.add_argument("--calibration_cv", type=int, default=3,
+                   help="Внутрішні фолди для CalibratedClassifierCV")
 
     # predict — inference через збережену модель
     p = sub.add_parser("predict")
@@ -1269,7 +1414,10 @@ if __name__ == "__main__":
                   n_estimators=args.n_estimators,
                   learning_rate=args.learning_rate,
                   num_leaves=args.num_leaves,
-                  cv_folds=args.cv_folds)
+                  cv_folds=args.cv_folds,
+                  calibrate=not args.no_calibrate,
+                  calibration_method=args.calibration_method,
+                  calibration_cv=args.calibration_cv)
     elif args.cmd == "predict":
         d_ovr = True if args.use_demucs else (False if args.no_demucs else None)
         b_ovr = True if args.use_beats  else (False if args.no_beats  else None)
