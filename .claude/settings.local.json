@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "PowerShell(Copy-Item \"c:\\\\GPR\\\\ml_worker\\\\simple_classify.py\" \"c:\\\\GPR\\\\hf_space\\\\simple_classify.py\" -Force; \"Copied: $\\(\\(Get-Item c:\\\\GPR\\\\hf_space\\\\simple_classify.py\\).Length\\) bytes\")",
-      "PowerShell(pip install --only-binary :all: aiofiles fastapi uvicorn -q 2>&1)"
-    ]
-  }
-}

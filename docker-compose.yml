@@ -19,7 +19,7 @@ services:
       dockerfile: Dockerfile
     environment:
       REDIS_URL: redis://redis:6379/0
-      HF_MODEL_REPO: PetroBodruh/grp-model
+      HF_MODEL_REPO: PetroBodruh/gpr-model
       # HF_TOKEN: <only if model repo is private>
       ALLOWED_ORIGINS: "http://localhost:5173"
     ports:

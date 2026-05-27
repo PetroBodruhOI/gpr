@@ -30,6 +30,11 @@ jobs:
         run: |
           python -m py_compile hf_space/app.py
           python -m py_compile hf_space/simple_classify.py
+      - name: Install ruff
+        run: pip install ruff==0.15.14
+      - name: Lint with ruff
+        working-directory: hf_space
+        run: ruff check .
 
   test-hf-space:
     runs-on: ubuntu-latest
