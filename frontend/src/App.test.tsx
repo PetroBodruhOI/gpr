@@ -1,11 +1,16 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
 
-// scrollIntoView is not implemented in jsdom — stub it
+// scrollIntoView is not implemented in jsdom — stub it.
+// Restore between tests so spies are fresh.
+const originalScrollIntoView = Element.prototype.scrollIntoView;
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
+});
+afterEach(() => {
+  Element.prototype.scrollIntoView = originalScrollIntoView;
 });
 
 describe("App", () => {
@@ -49,6 +54,8 @@ describe("App", () => {
     await user.click(ctas[0]);
 
     expect(screen.getByRole("button", { name: /Посилання на YouTube/ })).toBeInTheDocument();
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    });
   });
 });
