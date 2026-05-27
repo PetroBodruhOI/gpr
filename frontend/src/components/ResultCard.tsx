@@ -175,7 +175,7 @@ function TimelineTable({
 const HIGH_CONFIDENCE_THRESHOLD = 0.75;     // 75%
 const MAX_ALT_RECOMMENDATIONS = 3;
 
-function pickRecommendations(
+export function pickRecommendations(
   probs: Record<string, number>,
 ): { label: string; prob: number }[] {
   const sorted = Object.entries(probs)

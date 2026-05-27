@@ -19,6 +19,7 @@ jobs:
       - run: cd frontend && npm ci
       - run: cd frontend && npm run lint
       - run: cd frontend && npm run type-check
+      - run: cd frontend && npm test
       - run: cd frontend && npm run build
 
   lint-hf-space:
