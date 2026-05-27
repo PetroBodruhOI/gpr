@@ -106,7 +106,7 @@ def _load_model() -> dict:
             raise RuntimeError(
                 f"No model at {path} and HF_MODEL_REPO env var not set"
             )
-        from huggingface_hub import hf_hub_download
+        from huggingface_hub import hf_hub_download # pyright: ignore[reportMissingImports]
         logger.info("downloading_model", extra={"hf_repo": repo})
         path = hf_hub_download(
             repo_id=repo,

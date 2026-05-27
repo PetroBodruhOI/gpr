@@ -57,7 +57,9 @@ def separate_guitar(path: str, target_sr: int = 22050):
     and reads the resulting guitar.wav stem from disk.
     """
     import soundfile as sf
-    import subprocess, tempfile, shutil
+    import subprocess
+    import tempfile
+    import shutil
 
     os.makedirs(DEMUCS_CACHE_DIR, exist_ok=True)
     key = hashlib.md5(
@@ -597,10 +599,8 @@ def cmd_extract(audio_dir, output_csv, max_sec, hop_ratio, use_demucs, use_beats
     print(f"  📦 Рядків (chunks)  : {len(rows)}")
     print(f"  📁 Файлів           : {len(files) - len(errors)}/{len(files)}")
     print(f"  🗂  Класи            : {labels}")
-    print(f"  📊 По класах        : "
-          + ", ".join(f"{l}={c}" for l, c in sorted(label_counts.items())))
-    print(f"  🔀 Аугментація      : "
-          + ", ".join(f"{a}={c}" for a, c in sorted(aug_counts.items())))
+    print(f"  📊 По класах        : {', '.join(f'{li}={c}' for li, c in sorted(label_counts.items()))}")  # noqa: E741)
+    print(f"  🔀 Аугментація      : {', '.join(f'{a}={c}' for a, c in sorted(aug_counts.items()))}")
     print(f"  🎯 Фічей            : {len(FEATURE_KEYS)}  "
           f"(librosa: {len(LIBROSA_KEYS)}, beats: {len(BEAT_KEYS)})")
     print(f"  🎸 HTDemucs         : {'ON' if use_demucs else 'OFF'}")
@@ -708,7 +708,7 @@ def cmd_train(csv_path, output_pkl, n_estimators=500, learning_rate=0.05,
 
     label_counts = Counter(labels_raw)
     print(f"  Класи: {classes}")
-    print(f"  По класах: " + ", ".join(f"{c}={label_counts[c]}" for c in classes))
+    print("  По класах: " + ", ".join(f"{c}={label_counts[c]}" for c in classes))
     print(f"  Фічей: {len(feature_keys)}")
     print(f"  Калібрування: {'ON (' + calibration_method + f', cv={calibration_cv})' if calibrate else 'OFF'}\n")
 
@@ -807,17 +807,17 @@ def cmd_train(csv_path, output_pkl, n_estimators=500, learning_rate=0.05,
             "brier_base": bb, "brier_cal": bc,
             "ece_base":   eb, "ece_cal":   ec,
         }
-        print(f"\n  Калібрування (chunk-level, усереднено по фолдах):")
+        print("\n  Калібрування (chunk-level, усереднено по фолдах):")
         print(f"    Brier score : base={bb:.4f}  →  calibrated={bc:.4f}  "
               f"(Δ={bb-bc:+.4f})")
         print(f"    ECE         : base={eb:.4f}  →  calibrated={ec:.4f}  "
               f"(Δ={eb-ec:+.4f})")
-        print(f"    (нижче = краще; від'ємна Δ означає що калібрування погіршило)")
+        print("    (нижче = краще; від'ємна Δ означає що калібрування погіршило)")
 
     # ── Фінальне навчання на ВСІХ даних ──
     print(f"\n[train] Фінальне навчання на всіх {len(X)} chunks …")
     pipeline.fit(X, y)
-    print(f"  ✅ Готово")
+    print("  ✅ Готово")
 
     bundle = {
         "pipeline":     pipeline,
@@ -957,7 +957,7 @@ def cmd_predict(input_path, model_pkl, max_sec, hop_ratio,
     hard_winner = vote_counts.most_common(1)[0][0]
     hard_conf   = vote_counts[hard_winner] / n_chunks * 100
 
-    print(f"\n  Soft voting (середнє ймовірностей):")
+    print("\n  Soft voting (середнє ймовірностей):")
     mean_str = "".join(f"{p:>{col_w}.3f}" for p in mean_probs)
     print(f"  {'MEAN':>6}  {'':>12}  {final_label:>6}  {final_conf:>6.3f}  {mean_str}")
 
@@ -970,10 +970,10 @@ def cmd_predict(input_path, model_pkl, max_sec, hop_ratio,
               f"(soft={final_conf:.3f}, hard={hard_conf:.0f}%)")
     else:
         # Soft і hard не збіглись — попереджаємо
-        print(f"  ⚠️  РОЗБІЖНІСТЬ:")
+        print("  ⚠️  РОЗБІЖНІСТЬ:")
         print(f"     Soft voting → '{final_label}'  (p={final_conf:.3f})")
         print(f"     Hard voting → '{hard_winner}'  ({hard_conf:.0f}% chunks)")
-        print(f"     Рекомендація: довіряй soft (враховує впевненість модели)")
+        print("     Рекомендація: довіряй soft (враховує впевненість моделі)")
     print(f"{'═'*55}")
 
     return final_label, mean_probs
@@ -1007,7 +1007,8 @@ def cmd_diagnose(audio_dir, use_demucs, use_beats, noise=None):
             print(f"✗ {e}")
 
     if not records:
-        print("[!] Немає даних"); return
+        print("[!] Немає даних")
+        return
 
     raw_arr = np.stack(raw)
     scale   = raw_arr.std(axis=0)
@@ -1021,7 +1022,7 @@ def cmd_diagnose(audio_dir, use_demucs, use_beats, noise=None):
     i_m = np.mean(intra) if intra else 0
     e_m = np.mean(inter) if inter else 0
     gap = e_m - i_m
-    print(f"\n📊 Розділення (cosine):")
+    print("\n📊 Розділення (cosine):")
     print(f"   intra={i_m:.4f}  inter={e_m:.4f}  gap={gap:.4f}", end="  ")
     print("✅ ВІДМІННО" if gap > 0.4 else "✅ ДОБРЕ" if gap > 0.15
           else "⚠️  НОРМАЛЬНО" if gap > 0.05 else "❌ СЛАБО")
@@ -1069,7 +1070,8 @@ def cmd_build(audio_dir, output, max_sec, hop_ratio, use_demucs, use_beats,
             print(f"  → {fname}: ✗ {e}")
 
     if not records:
-        print("[!] Немає даних"); return
+        print("[!] Немає даних")
+        return
 
     raw_arr = np.stack(raw)
     scale = raw_arr.std(axis=0)
@@ -1103,7 +1105,6 @@ def cmd_classify(input_path, db_path, top_k, max_sec, hop_ratio,
     use_beats  = db_use_beats  if use_beats_override  is None else use_beats_override
 
     y, sr = load_audio(input_path, use_demucs=use_demucs)
-    duration = len(y) / sr
     hop_sec = max_sec * hop_ratio
     beats, downbeats = _file_beats(input_path, y, sr, use_beats)
 
@@ -1192,7 +1193,8 @@ def _download_audio_ytdlp(url: str, tmp_path: str, start_sec=None, duration_sec=
         return title, uploader, dur
 
     else:  # CLI
-        import subprocess, json
+        import subprocess
+        import json
         # Спочатку отримуємо метадані (без завантаження)
         meta_cmd = ["yt-dlp", "--dump-json", "--no-playlist", url]
         meta_out = subprocess.run(
@@ -1241,7 +1243,8 @@ def cmd_predict_url(url, model_pkl, max_sec, hop_ratio,
     Юридична позиція: особисте некомерційне використання для аналізу,
     аудіо не зберігається після класифікації.
     """
-    import tempfile, shutil
+    import tempfile
+    import shutil
 
     # Попередження користувачу
     print("─" * 60)
@@ -1261,8 +1264,8 @@ def cmd_predict_url(url, model_pkl, max_sec, hop_ratio,
         print(f"[url] Завантажую аудіо з:\n  {url}\n")
         if start_sec is not None or duration_sec is not None:
             seg = []
-            if start_sec   is not None: seg.append(f"start={start_sec}s")
-            if duration_sec is not None: seg.append(f"duration={duration_sec}s")
+            if start_sec   is not None: seg.append(f"start={start_sec}s")  # noqa: E701
+            if duration_sec is not None: seg.append(f"duration={duration_sec}s")  # noqa: E701
             print(f"  Сегмент: {', '.join(seg)}")
 
         title, uploader, total_dur = _download_audio_ytdlp(
@@ -1295,7 +1298,7 @@ def cmd_predict_url(url, model_pkl, max_sec, hop_ratio,
     finally:
         # ── Гарантоване видалення тимчасових файлів ──
         shutil.rmtree(tmp_dir, ignore_errors=True)
-        print(f"\n  🗑  Тимчасовий файл видалено.")
+        print("\n  🗑  Тимчасовий файл видалено.")
 
 
 # ─── Main ────────────────────────────────────────────────────────────────────
