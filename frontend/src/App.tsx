@@ -5,12 +5,10 @@ import ResultCard from "./components/ResultCard";
 import PatternsGallery from "./components/PatternsGallery";
 import { TaskStatus, pollTask } from "./api/client";
 
-type Mode = "file" | "url";
 type View = "patterns" | "analyze";
 
 export default function App() {
   const [view, setView] = useState<View>("analyze");
-  const [mode, setMode] = useState<Mode>("file");
   const [task, setTask] = useState<TaskStatus | null>(null);
   const [error, setError] = useState<string>("");
   const formRef = useRef<HTMLDivElement | null>(null);
@@ -135,7 +133,7 @@ export default function App() {
             {!isTaskRunning && (
               <div ref={formRef} className="scroll-mt-24">
                 <div className="card mb-6">
-                  {mode === "file" && <UploadForm onStart={handleTaskStart} />}
+                  {<UploadForm onStart={handleTaskStart} />}
                 </div>
               </div>
             )}
