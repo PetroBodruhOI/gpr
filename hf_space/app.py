@@ -21,6 +21,9 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from typing import Optional
+from fastapi import Response, Header
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+import base64
 
 import aiofiles
 import numpy as np
@@ -28,7 +31,7 @@ import pandas as pd
 import redis as redis_lib
 from fastapi import BackgroundTasks, FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_client import Counter, Histogram, make_asgi_app
+from prometheus_client import Counter, Histogram
 from pydantic import BaseModel
 from pythonjsonlogger import jsonlogger
 
@@ -128,9 +131,37 @@ async def lifespan(_app: FastAPI):
     })
     yield
 
+DUMMY_USER = "grafana"
+DUMMY_PASS = "grafana123"
+
+def check_basic_auth(authorization: str | None):
+    if not authorization:
+        raise HTTPException(status_code=401)
+
+    try:
+        scheme, credentials = authorization.split()
+        if scheme.lower() != "basic":
+            raise HTTPException(status_code=401)
+
+        decoded = base64.b64decode(credentials).decode()
+        username, password = decoded.split(":")
+
+        if username != DUMMY_USER or password != DUMMY_PASS:
+            raise HTTPException(status_code=401)
+
+    except Exception:
+        raise HTTPException(status_code=401)
+
 
 app = FastAPI(title="GPR Worker", lifespan=lifespan)
-app.mount("/metrics", make_asgi_app())   # Prometheus exposition endpoint
+@app.get("/metrics")
+def metrics(authorization: str | None = Header(default=None)):
+    check_basic_auth(authorization)
+
+    return Response(
+        generate_latest(),
+        media_type=CONTENT_TYPE_LATEST
+    )
 
 _allowed = os.environ.get("ALLOWED_ORIGINS", "*")
 app.add_middleware(
