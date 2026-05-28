@@ -9,10 +9,40 @@ export default function UploadForm({ onStart }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [error, setError] = useState("");
+
+  const allowed = [
+    "audio/wav",
+    "audio/mpeg",
+    "audio/mp3",
+    "audio/ogg",
+    "audio/flac",
+  ];
+
+  const validateFile = (f: File | null): boolean => {
+    if (!f) return false;
+
+    if (!allowed.includes(f.type)) {
+      setError("Підтримуються лише аудіофайли MP3, WAV, OGG, FLAC");
+      setFile(null);
+      return false;
+    }
+
+    setError("");
+    setFile(f);
+    return true;
+  };
+
+  const removeFile = () => {
+    setFile(null);
+    setError("");
+  };
 
   const submit = async () => {
     if (!file) return;
+
     setBusy(true);
+
     try {
       const taskId = await predictFile(file);
       onStart(taskId);
@@ -24,6 +54,7 @@ export default function UploadForm({ onStart }: Props) {
   const handleDragOver = (e: React.DragEvent<HTMLLabelElement>) => {
     e.preventDefault();
     e.stopPropagation();
+
     if (!busy) setDragOver(true);
   };
 
@@ -36,14 +67,14 @@ export default function UploadForm({ onStart }: Props) {
   const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
     e.preventDefault();
     e.stopPropagation();
+
     setDragOver(false);
+
     if (busy) return;
+
     const dropped = e.dataTransfer.files?.[0];
-    if (dropped && dropped.type.startsWith("audio/")) {
-      setFile(dropped);
-    } else if (dropped) {
-      setFile(dropped);
-    }
+
+    validateFile(dropped ?? null);
   };
 
   return (
@@ -52,6 +83,7 @@ export default function UploadForm({ onStart }: Props) {
         <label className="block text-xs font-semibold text-white/50 mb-2 uppercase tracking-wider">
           Аудіофайл
         </label>
+
         <label
           onDragOver={handleDragOver}
           onDragEnter={handleDragOver}
@@ -59,49 +91,136 @@ export default function UploadForm({ onStart }: Props) {
           onDrop={handleDrop}
           className="group flex flex-col items-center justify-center w-full h-44 rounded-lg cursor-pointer transition-all duration-200 relative overflow-hidden"
           style={{
-            background: dragOver ? "rgba(16, 185, 129, 0.1)" : "rgba(10, 20, 36, 0.4)",
+            background: dragOver
+              ? "rgba(16, 185, 129, 0.1)"
+              : "rgba(10, 20, 36, 0.4)",
             border: dragOver
               ? "1.5px dashed rgba(16, 185, 129, 0.6)"
               : "1.5px dashed rgba(255, 255, 255, 0.15)",
           }}
         >
-          <div className={`absolute inset-0 bg-emerald-500/5 transition-opacity ${dragOver ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`} />
+          <div
+            className={`absolute inset-0 bg-emerald-500/5 transition-opacity ${
+              dragOver
+                ? "opacity-100"
+                : "opacity-0 group-hover:opacity-100"
+            }`}
+          />
+
           <div className="relative flex flex-col items-center justify-center pointer-events-none">
-            <div className={`w-12 h-12 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mb-3 transition-all ${dragOver ? "bg-emerald-500/30 scale-110" : "group-hover:bg-emerald-500/20"}`}>
-              <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            <div
+              className={`w-12 h-12 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mb-3 transition-all ${
+                dragOver
+                  ? "bg-emerald-500/30 scale-110"
+                  : "group-hover:bg-emerald-500/20"
+              }`}
+            >
+              <svg
+                className="w-6 h-6 text-emerald-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                />
               </svg>
             </div>
+
             <p className="text-white font-medium mb-1">
-              {dragOver ? "Відпустіть, щоб завантажити" : file ? file.name : "Перетягніть аудіофайл або натисніть, щоб вибрати"}
+              {dragOver
+                ? "Відпустіть, щоб завантажити"
+                : file
+                ? file.name
+                : "Перетягніть аудіофайл або натисніть, щоб вибрати"}
             </p>
-            <p className="text-white/40 text-xs">MP3 · WAV · OGG · FLAC</p>
+
+            <p className="text-white/40 text-xs">
+              MP3 · WAV · OGG · FLAC
+            </p>
           </div>
+
           <input
             type="file"
-            accept="audio/*"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            accept=".mp3,.wav,.ogg,.flac,audio/*"
             disabled={busy}
             className="hidden"
+            onChange={(e) => {
+              const selected = e.target.files?.[0] ?? null;
+              validateFile(selected);
+            }}
           />
         </label>
       </div>
 
+      {error && (
+        <div
+          className="p-3 rounded-xl text-sm text-red-300"
+          style={{
+            background: "rgba(239, 68, 68, 0.1)",
+            border: "1px solid rgba(239, 68, 68, 0.3)",
+          }}
+        >
+          {error}
+        </div>
+      )}
+
       {file && (
-        <div className="p-4 rounded-xl flex items-center gap-3"
-             style={{
-               background: "rgba(34, 197, 94, 0.1)",
-               border: "1px solid rgba(34, 197, 94, 0.3)"
-             }}>
+        <div
+          className="p-4 rounded-xl flex items-center gap-3"
+          style={{
+            background: "rgba(34, 197, 94, 0.1)",
+            border: "1px solid rgba(34, 197, 94, 0.3)",
+          }}
+        >
           <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
-            <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+            <svg
+              className="w-4 h-4 text-green-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2.5}
+                d="M5 13l4 4L19 7"
+              />
             </svg>
           </div>
+
           <div className="min-w-0 flex-1">
-            <p className="text-green-300 text-sm font-semibold">Файл готовий</p>
-            <p className="text-white/60 text-sm truncate">{file.name}</p>
+            <p className="text-green-300 text-sm font-semibold">
+              Файл готовий
+            </p>
+
+            <p className="text-white/60 text-sm truncate">
+              {file.name}
+            </p>
           </div>
+
+          <button
+            type="button"
+            onClick={removeFile}
+            className="text-red-300 hover:text-red-200 transition"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2.5}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
         </div>
       )}
 
@@ -113,15 +232,32 @@ export default function UploadForm({ onStart }: Props) {
         {busy ? (
           <span className="flex items-center justify-center gap-2">
             <span className="w-1.5 h-1.5 bg-slate-900 rounded-full animate-pulse" />
-            <span className="w-1.5 h-1.5 bg-slate-900 rounded-full animate-pulse" style={{ animationDelay: "0.2s" }} />
-            <span className="w-1.5 h-1.5 bg-slate-900 rounded-full animate-pulse" style={{ animationDelay: "0.4s" }} />
+            <span
+              className="w-1.5 h-1.5 bg-slate-900 rounded-full animate-pulse"
+              style={{ animationDelay: "0.2s" }}
+            />
+            <span
+              className="w-1.5 h-1.5 bg-slate-900 rounded-full animate-pulse"
+              style={{ animationDelay: "0.4s" }}
+            />
             Обробка
           </span>
         ) : (
           <span className="flex items-center justify-center gap-2">
             Підібрати патерн
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2.5}
+                d="M17 8l4 4m0 0l-4 4m4-4H3"
+              />
             </svg>
           </span>
         )}
