@@ -50,11 +50,6 @@ export async function getTask(taskId: string): Promise<TaskStatus> {
   return data;
 }
 
-export async function submitFeedback(taskId: string,
-                                     rating: "good" | "bad"): Promise<void> {
-  await api.post(`/feedback/${taskId}`, { rating });
-}
-
 /** Polling кожні 1.5 сек, поки статус не done/error. */
 export async function pollTask(
   taskId: string,
@@ -67,4 +62,9 @@ export async function pollTask(
     if (t.status === "done" || t.status === "error") return t;
     await new Promise((r) => setTimeout(r, intervalMs));
   }
+}
+
+export async function submitFeedback(taskId: string,
+                                     rating: "good" | "bad"): Promise<void> {
+  await api.post(`/feedback/${taskId}`, { rating });
 }

@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 import UploadForm from "./components/UploadForm";
-import UrlForm from "./components/UrlForm";
 import ProgressBar from "./components/ProgressBar";
 import ResultCard from "./components/ResultCard";
 import PatternsGallery from "./components/PatternsGallery";
@@ -136,7 +135,6 @@ export default function App() {
             {!isTaskRunning && (
               <div ref={formRef} className="scroll-mt-24">
                 <div className="card mb-6">
-                  {mode === "url" && <UrlForm onStart={handleTaskStart} />}
                   {mode === "file" && <UploadForm onStart={handleTaskStart} />}
                 </div>
               </div>
