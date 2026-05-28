@@ -33,3 +33,9 @@ Thumbs.db
 /tmp/
 aude/
 .claude/
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml

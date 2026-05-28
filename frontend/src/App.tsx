@@ -1,17 +1,14 @@
 import { useRef, useState } from "react";
 import UploadForm from "./components/UploadForm";
-import UrlForm from "./components/UrlForm";
 import ProgressBar from "./components/ProgressBar";
 import ResultCard from "./components/ResultCard";
 import PatternsGallery from "./components/PatternsGallery";
 import { TaskStatus, pollTask } from "./api/client";
 
-type Mode = "file" | "url";
 type View = "patterns" | "analyze";
 
 export default function App() {
   const [view, setView] = useState<View>("analyze");
-  const [mode, setMode] = useState<Mode>("url");
   const [task, setTask] = useState<TaskStatus | null>(null);
   const [error, setError] = useState<string>("");
   const formRef = useRef<HTMLDivElement | null>(null);
@@ -135,31 +132,8 @@ export default function App() {
             {/* Form section — hidden once a task is in flight */}
             {!isTaskRunning && (
               <div ref={formRef} className="scroll-mt-24">
-                <div className="flex gap-1.5 mb-6 p-1.5 rounded-xl bg-slate-900/40 backdrop-blur-xl border border-white/5">
-                  <button
-                    onClick={() => setMode("url")}
-                    className={`flex-1 py-2.5 px-4 rounded-lg font-medium transition-all duration-200 ${
-                      mode === "url"
-                        ? "bg-blue-900/60 text-white border border-blue-500/30"
-                        : "text-white/50 hover:text-white/80"
-                    }`}
-                  >
-                    Посилання на YouTube
-                  </button>
-                  <button
-                    onClick={() => setMode("file")}
-                    className={`flex-1 py-2.5 px-4 rounded-lg font-medium transition-all duration-200 ${
-                      mode === "file"
-                        ? "bg-blue-900/60 text-white border border-blue-500/30"
-                        : "text-white/50 hover:text-white/80"
-                    }`}
-                  >
-                    Завантажити файл
-                  </button>
-                </div>
                 <div className="card mb-6">
-                  {mode === "url" && <UrlForm onStart={handleTaskStart} />}
-                  {mode === "file" && <UploadForm onStart={handleTaskStart} />}
+                  {<UploadForm onStart={handleTaskStart} />}
                 </div>
               </div>
             )}

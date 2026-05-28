@@ -16,9 +16,6 @@ afterEach(() => {
 describe("App", () => {
   it("opens on 'Аналіз' view by default (URL form visible)", () => {
     render(<App />);
-    // The mode toggle for URL/file is unique to the analyze view
-    expect(screen.getByRole("button", { name: /Посилання на YouTube/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Завантажити файл/ })).toBeInTheDocument();
   });
 
   it("renders sticky header with both nav items", () => {
@@ -53,7 +50,6 @@ describe("App", () => {
     const ctas = screen.getAllByRole("button", { name: /Аналіз/ });
     await user.click(ctas[0]);
 
-    expect(screen.getByRole("button", { name: /Посилання на YouTube/ })).toBeInTheDocument();
     await waitFor(() => {
       expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
     });
