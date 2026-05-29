@@ -8,6 +8,8 @@ on:
 env:
   HF_SPACE_URL: https://petrobodruh-gpr-worker.hf.space
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  DUMMY_USER: "grafana"
+  DUMMY_PASS: "grafana123"
 
 jobs:
   snapshot:
@@ -29,6 +31,7 @@ jobs:
           for attempt in 1 2 3; do
             echo "Attempt $attempt: fetching metrics…"
             HTTP_CODE=$(curl -sLm 60 -w "%{http_code}" \
+              -u "$DUMMY_USER:$DUMMY_PASS" \
               "$HF_SPACE_URL/metrics" -o metrics.txt)
             if [ "$HTTP_CODE" = "200" ] && [ -s metrics.txt ]; then
               echo "✓ Got $(wc -c < metrics.txt) bytes (HTTP $HTTP_CODE)"
@@ -63,25 +66,6 @@ jobs:
 
           print(f"## 🎸 GPR Stats — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}\n")
 
-          # ── Predictions ──
-          rows = []
-          for fam in families:
-              if fam.name == "gpr_predictions_total":
-                  for s in fam.samples:
-                      if s.name == "gpr_predictions_total":
-                          rows.append((s.labels.get("predicted_class", "?"),
-                                       s.labels.get("source", "?"),
-                                       s.labels.get("status", "?"),
-                                       int(s.value)))
-          if rows:
-              total = sum(r[3] for r in rows)
-              print(f"### 📊 Predictions (total: **{total}**)")
-              print("| Class | Source | Status | Count |")
-              print("|-------|--------|--------|-------|")
-              for cls, src, st, cnt in sorted(rows):
-                  print(f"| `{cls}` | {src} | {st} | {cnt} |")
-              print()
-
           # ── Helper: extract _sum and _count for histograms ──
           def hist_agg(family_name, group_by_labels):
               counts, sums = defaultdict(float), defaultdict(float)
@@ -96,57 +80,75 @@ jobs:
                           sums[key] = s.value
               return counts, sums
 
+          def details(summary, lines):
+              print(f"<details><summary>{summary}</summary>\n")
+              for l in lines:
+                  print(l)
+              print("\n</details>\n")
+
+          # ── Predictions ──
+          rows = []
+          for fam in families:
+              if fam.name == "gpr_predictions_total":
+                  for s in fam.samples:
+                      if s.name == "gpr_predictions_total":
+                          rows.append((s.labels.get("predicted_class", "?"),
+                                       s.labels.get("source", "?"),
+                                       s.labels.get("status", "?"),
+                                       int(s.value)))
+          if rows:
+              total = sum(r[3] for r in rows)
+              body = [
+                  "| Class | Source | Status | Count |",
+                  "|-------|--------|--------|-------|",
+              ] + [f"| `{cls}` | {src} | {st} | {cnt} |" for cls, src, st, cnt in sorted(rows)]
+              details(f"📊 Predictions — total: **{total}**", body)
+
           # ── Pipeline stages ──
           counts, sums = hist_agg("gpr_stage_duration_seconds", ["stage"])
           if counts:
-              print("### ⚙️ Pipeline performance")
-              print("| Stage | Calls | Total sec | Avg sec |")
-              print("|-------|-------|-----------|---------|")
-              order = ["download", "demucs", "beat", "classify"]
-              for stage in order:
+              body = [
+                  "| Stage | Calls | Total sec | Avg sec |",
+                  "|-------|-------|-----------|---------|",
+              ]
+              for stage in ["download", "demucs", "beat", "classify"]:
                   key = (stage,)
                   if key in counts:
                       cnt = counts[key]
                       avg = sums[key] / cnt if cnt else 0
-                      print(f"| `{stage}` | {int(cnt)} | {sums[key]:.1f} | {avg:.1f} |")
-              print()
+                      body.append(f"| `{stage}` | {int(cnt)} | {sums[key]:.1f} | {avg:.1f} |")
+              details("⚙️ Pipeline performance", body)
 
           # ── Inference duration (per class) ──
           counts, sums = hist_agg("gpr_inference_duration_seconds",
                                   ["predicted_class", "source"])
           if counts:
-              print("### ⏱️ End-to-end inference time")
-              print("| Class | Source | Calls | Avg sec |")
-              print("|-------|--------|-------|---------|")
-              for key in sorted(counts.keys()):
-                  cnt = counts[key]
-                  avg = sums[key] / cnt if cnt else 0
-                  print(f"| `{key[0]}` | {key[1]} | {int(cnt)} | {avg:.1f} |")
-              print()
+              body = [
+                  "| Class | Source | Calls | Avg sec |",
+                  "|-------|--------|-------|---------|",
+              ] + [f"| `{key[0]}` | {key[1]} | {int(counts[key])} | {sums[key]/counts[key]:.1f} |"
+                   for key in sorted(counts.keys())]
+              details("⏱️ End-to-end inference time", body)
 
           # ── Audio duration ──
           counts, sums = hist_agg("gpr_audio_duration_seconds", ["source"])
           if counts:
-              print("### 🎵 Audio length")
-              print("| Source | Tracks | Avg seconds |")
-              print("|--------|--------|-------------|")
-              for key in sorted(counts.keys()):
-                  cnt = counts[key]
-                  avg = sums[key] / cnt if cnt else 0
-                  print(f"| {key[0]} | {int(cnt)} | {avg:.1f} |")
-              print()
+              body = [
+                  "| Source | Tracks | Avg seconds |",
+                  "|--------|--------|-------------|",
+              ] + [f"| {key[0]} | {int(counts[key])} | {sums[key]/counts[key]:.1f} |"
+                   for key in sorted(counts.keys())]
+              details("🎵 Audio length", body)
 
           # ── Confidence ──
           counts, sums = hist_agg("gpr_inference_confidence", ["predicted_class"])
           if counts:
-              print("### 🎯 Average confidence")
-              print("| Class | Predictions | Avg confidence |")
-              print("|-------|-------------|----------------|")
-              for key in sorted(counts.keys()):
-                  cnt = counts[key]
-                  avg = sums[key] / cnt if cnt else 0
-                  print(f"| `{key[0]}` | {int(cnt)} | **{avg * 100:.1f}%** |")
-              print()
+              body = [
+                  "| Class | Predictions | Avg confidence |",
+                  "|-------|-------------|----------------|",
+              ] + [f"| `{key[0]}` | {int(counts[key])} | **{sums[key]/counts[key]*100:.1f}%** |"
+                   for key in sorted(counts.keys())]
+              details("🎯 Average confidence", body)
 
           # ── User feedback ──
           agg = defaultdict(lambda: {"good": 0, "bad": 0})
@@ -162,14 +164,15 @@ jobs:
               total_g = sum(v["good"] for v in agg.values())
               total_b = sum(v["bad"] for v in agg.values())
               overall = total_g / (total_g + total_b) * 100 if (total_g + total_b) else 0
-              print(f"### 👍/👎 User feedback (satisfaction: **{overall:.0f}%**)")
-              print("| Class | 👍 Good | 👎 Bad | Score |")
-              print("|-------|---------|--------|-------|")
+              body = [
+                  "| Class | 👍 Good | 👎 Bad | Score |",
+                  "|-------|---------|--------|-------|",
+              ]
               for cls in sorted(agg.keys()):
                   g = int(agg[cls]["good"]); b = int(agg[cls]["bad"])
                   score = f"{g/(g+b)*100:.0f}%" if (g+b) else "—"
-                  print(f"| `{cls}` | {g} | {b} | {score} |")
-              print()
+                  body.append(f"| `{cls}` | {g} | {b} | {score} |")
+              details(f"👍/👎 User feedback — satisfaction: **{overall:.0f}%**", body)
 
           import os
           run_id = os.environ.get("GITHUB_RUN_ID", "?")
