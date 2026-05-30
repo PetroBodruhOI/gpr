@@ -161,9 +161,17 @@ jobs:
                           if r in ("good", "bad"):
                               agg[cls][r] = s.value
           if agg:
-              total_g = sum(v["good"] for v in agg.values())
-              total_b = sum(v["bad"] for v in agg.values())
-              overall = total_g / (total_g + total_b) * 100 if (total_g + total_b) else 0
+              total_g = int(sum(v["good"] for v in agg.values()))
+              total_b = int(sum(v["bad"] for v in agg.values()))
+              total_all = total_g + total_b
+              overall = total_g / total_all * 100 if total_all else 0
+              summary = (
+                  f"👍/👎 User feedback &nbsp;·&nbsp; "
+                  f"всього: **{total_all}** &nbsp;|&nbsp; "
+                  f"👍 {total_g} &nbsp;|&nbsp; "
+                  f"👎 {total_b} &nbsp;|&nbsp; "
+                  f"задоволення: **{overall:.0f}%**"
+              )
               body = [
                   "| Class | 👍 Good | 👎 Bad | Score |",
                   "|-------|---------|--------|-------|",
@@ -172,7 +180,7 @@ jobs:
                   g = int(agg[cls]["good"]); b = int(agg[cls]["bad"])
                   score = f"{g/(g+b)*100:.0f}%" if (g+b) else "—"
                   body.append(f"| `{cls}` | {g} | {b} | {score} |")
-              details(f"👍/👎 User feedback — satisfaction: **{overall:.0f}%**", body)
+              details(summary, body)
 
           import os
           run_id = os.environ.get("GITHUB_RUN_ID", "?")
