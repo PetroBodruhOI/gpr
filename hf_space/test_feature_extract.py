@@ -317,7 +317,7 @@ def test_load_audio_with_demucs_delegates(tmp_path):
     with patch("ml_pipeline.preprocess.separate_guitar", return_value=(y, sr)) as mock_sep:
         y_out, sr_out = load_audio(wav_path, use_demucs=True, sr=sr)
 
-    mock_sep.assert_called_once_with(wav_path, target_sr=sr)
+    mock_sep.assert_called_once_with(wav_path, target_sr=sr, progress_cb=None)
     assert sr_out == sr
 
 

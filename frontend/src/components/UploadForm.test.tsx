@@ -20,7 +20,7 @@ describe("UploadForm", () => {
   it("renders upload area with placeholder text", () => {
     render(<UploadForm onStart={vi.fn()} />);
     expect(
-      screen.getByText(/Перетягніть аудіофайл або натисніть/),
+      screen.getByText(/Перетягніть аудіо або відео або натисніть/),
     ).toBeInTheDocument();
   });
 
@@ -56,7 +56,7 @@ describe("UploadForm", () => {
     await user.upload(input, new File(["x"], "fake.mp3", { type: "application/pdf" }));
 
     expect(
-      screen.getByText(/Підтримуються лише аудіофайли/),
+      screen.getByText(/Підтримуються аудіофайли/),
     ).toBeInTheDocument();
     expect(screen.queryByText("Файл готовий")).not.toBeInTheDocument();
   });
@@ -114,7 +114,7 @@ describe("UploadForm", () => {
     render(<UploadForm onStart={vi.fn()} />);
 
     const dropLabel = screen
-      .getByText(/Перетягніть аудіофайл/)
+      .getByText(/Перетягніть аудіо або відео/)
       .closest("label")!;
 
     fireEvent.dragOver(dropLabel);
@@ -125,7 +125,7 @@ describe("UploadForm", () => {
     render(<UploadForm onStart={vi.fn()} />);
 
     const dropLabel = screen
-      .getByText(/Перетягніть аудіофайл/)
+      .getByText(/Перетягніть аудіо або відео/)
       .closest("label")!;
 
     fireEvent.dragOver(dropLabel);
@@ -138,7 +138,7 @@ describe("UploadForm", () => {
     render(<UploadForm onStart={vi.fn()} />);
 
     const dropLabel = screen
-      .getByText(/Перетягніть аудіофайл/)
+      .getByText(/Перетягніть аудіо або відео/)
       .closest("label")!;
     const file = makeAudioFile("dropped.wav", "audio/wav");
 
@@ -155,10 +155,10 @@ describe("UploadForm", () => {
 
     const input = document.querySelector("input[type=file]") as HTMLInputElement;
     await user.upload(input, new File(["x"], "fake.mp3", { type: "application/pdf" }));
-    expect(screen.getByText(/Підтримуються лише аудіофайли/)).toBeInTheDocument();
+    expect(screen.getByText(/Підтримуються аудіофайли/)).toBeInTheDocument();
 
     await user.upload(input, makeAudioFile("good.mp3", "audio/mpeg"));
-    expect(screen.queryByText(/Підтримуються лише аудіофайли/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Підтримуються аудіофайли/)).not.toBeInTheDocument();
     expect(screen.getByText("Файл готовий")).toBeInTheDocument();
   });
 });
