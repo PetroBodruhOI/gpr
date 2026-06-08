@@ -4,6 +4,9 @@ ML pipeline — HTDemucs guitar separation, BeatThis beat detection, yt-dlp audi
 
 import hashlib
 import os
+import re
+import threading
+import time
 
 import librosa
 import numpy as np
@@ -15,13 +18,15 @@ DEMUCS_CACHE_DIR = "./_demucs_cache"
 _DEMUCS_SEPARATOR = None
 
 
-def separate_guitar(path: str, target_sr: int = 22050):
+def separate_guitar(path: str, target_sr: int = 22050, progress_cb=None):
     """
     CLI-based Demucs separation (compatible with demucs 4.0.1 from PyPI,
     where demucs.api doesn't yet exist). Calls `python -m demucs -n htdemucs_6s`
 
     Note: Demucs naturally outputs at 16kHz (for compatibility with trained models)
     and reads the resulting guitar.wav stem from disk.
+
+    progress_cb(pct: int) — called when Demucs reports N% in stderr (0-100).
     """
     import shutil
     import subprocess
@@ -49,13 +54,47 @@ def separate_guitar(path: str, target_sr: int = 22050):
             "-o", out_dir,
             path,
         ]
-        result = subprocess.run(
-            cmd, capture_output=True, text=True,
-            encoding="utf-8", errors="replace",
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
         )
-        if result.returncode != 0:
+
+        stderr_lines = []
+        last_pct = [-1]
+
+        def _drain_stderr():
+            buf = ""
+            while True:
+                chunk = proc.stderr.read(128)
+                if not chunk:
+                    break
+                buf += chunk
+                parts = re.split(r"[\r\n]", buf)
+                buf = parts[-1]
+                for part in parts[:-1]:
+                    stderr_lines.append(part)
+                    if progress_cb:
+                        m = re.search(r"(\d+)%", part)
+                        if m:
+                            pct = int(m.group(1))
+                            if pct != last_pct[0]:
+                                last_pct[0] = pct
+                                progress_cb(pct)
+            if buf:
+                stderr_lines.append(buf)
+
+        drain_thread = threading.Thread(target=_drain_stderr, daemon=True)
+        drain_thread.start()
+        proc.wait()
+        drain_thread.join()
+
+        if proc.returncode != 0:
             raise RuntimeError(
-                f"demucs failed (rc={result.returncode}):\n{result.stderr}"
+                f"demucs failed (rc={proc.returncode}):\n" + "\n".join(stderr_lines)
             )
 
         track_stem = os.path.splitext(os.path.basename(path))[0]
@@ -76,7 +115,7 @@ def separate_guitar(path: str, target_sr: int = 22050):
         shutil.rmtree(out_dir, ignore_errors=True)
 
 
-def load_audio(path: str, use_demucs: bool, sr: int = 22050):
+def load_audio(path: str, use_demucs: bool, sr: int = 22050, progress_cb=None):
     """Load audio at target sample rate (22050Hz for trained model compatibility).
 
     ВАЖЛИВО: НЕ застосовуй тут жодних audio-перетворень
@@ -85,7 +124,7 @@ def load_audio(path: str, use_demucs: bool, sr: int = 22050):
     зміщує розподіл фіч і ламає predict.
     """
     if use_demucs:
-        return separate_guitar(path, target_sr=sr)
+        return separate_guitar(path, target_sr=sr, progress_cb=progress_cb)
     return librosa.load(path, sr=sr, mono=True)
 
 
@@ -111,10 +150,15 @@ def _get_beat_tracker():
     return _BEAT_TRACKER
 
 
-def compute_beats(y: np.ndarray, sr: int, cache_key: str = None):
+_BEAT_TICK_INTERVAL = 3  # seconds between BeatThis progress ticks
+
+
+def compute_beats(y: np.ndarray, sr: int, cache_key: str = None, progress_cb=None):
     """
     Returns (beats, downbeats) — np.float32 arrays of times in seconds.
     cache_key: persistent disk-cache identifier (e.g. abs_path|mtime).
+    progress_cb(elapsed_s: int) — called every _BEAT_TICK_INTERVAL seconds
+    while the tracker runs (BeatThis has no internal progress API).
     """
     cache_path = None
     if cache_key:
@@ -126,20 +170,44 @@ def compute_beats(y: np.ndarray, sr: int, cache_key: str = None):
             return d["beats"], d["downbeats"]
 
     tracker = _get_beat_tracker()
-    beats, downbeats = tracker(y, sr)
-    beats = np.asarray(beats, dtype=np.float32)
-    downbeats = np.asarray(downbeats, dtype=np.float32)
+
+    if progress_cb is None:
+        raw = tracker(y, sr)
+    else:
+        result_box = [None]
+        exc_box = [None]
+
+        def _run():
+            try:
+                result_box[0] = tracker(y, sr)
+            except Exception as e:
+                exc_box[0] = e
+
+        worker = threading.Thread(target=_run, daemon=True)
+        worker.start()
+        elapsed = 0
+        while worker.is_alive():
+            time.sleep(_BEAT_TICK_INTERVAL)
+            elapsed += _BEAT_TICK_INTERVAL
+            progress_cb(elapsed)
+        worker.join()
+        if exc_box[0]:
+            raise exc_box[0]
+        raw = result_box[0]
+
+    beats = np.asarray(raw[0], dtype=np.float32)
+    downbeats = np.asarray(raw[1], dtype=np.float32)
 
     if cache_path:
         np.savez(cache_path, beats=beats, downbeats=downbeats)
     return beats, downbeats
 
 
-def _file_beats(fpath, y, sr, use_beats):
+def _file_beats(fpath, y, sr, use_beats, progress_cb=None):
     if not use_beats:
         return None, None
     cache_key = f"{os.path.abspath(fpath)}|{os.path.getmtime(fpath)}|sr{sr}"
-    return compute_beats(y, sr, cache_key=cache_key)
+    return compute_beats(y, sr, cache_key=cache_key, progress_cb=progress_cb)
 
 
 # ─── yt-dlp audio download ───────────────────────────────────────────────────

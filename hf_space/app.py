@@ -248,7 +248,11 @@ def run_predict(task_id: str, audio_path: Optional[str] = None,
         _set_progress(task_id, 30, "Виділяю гітарний стем (HTDemucs)…")
         t_demucs = time.perf_counter()
         try:
-            y, sr = load_audio(audio_path, use_demucs=True)  # sr=22050
+            def _demucs_cb(pct: int) -> None:
+                app_pct = 30 + int(pct * 25 / 100)  # maps 0-100 → 30-55
+                _set_progress(task_id, app_pct, f"HTDemucs: {pct}%…")
+
+            y, sr = load_audio(audio_path, use_demucs=True, progress_cb=_demucs_cb)  # sr=22050
         except Exception as e:
             _set_progress(task_id, 0, f"Demucs error: {e}", status="error")
             PREDICTIONS_TOTAL.labels(source=source, predicted_class="none",
@@ -266,7 +270,14 @@ def run_predict(task_id: str, audio_path: Optional[str] = None,
         # ── 3. BeatThis ──
         _set_progress(task_id, 55, "Аналізую ритм (BeatThis)…")
         t_beat = time.perf_counter()
-        beats, downbeats = _file_beats(audio_path, y, sr, use_beats=True)
+
+        def _beat_cb(elapsed_s: int) -> None:
+            # BeatThis typically takes 16-28s; cap at 69 so 70 means "done"
+            app_pct = min(69, 55 + int(elapsed_s * 14 / 24))
+            _set_progress(task_id, app_pct, f"Аналізую ритм… ({elapsed_s}с)")
+
+        beats, downbeats = _file_beats(audio_path, y, sr, use_beats=True,
+                                       progress_cb=_beat_cb)
         STAGE_DURATION.labels(stage="beat").observe(
             time.perf_counter() - t_beat
         )
