@@ -1,7 +1,6 @@
 """Tests for ml_pipeline/feature_extract.py and ml_pipeline/preprocess.py helpers."""
 
 import os
-import tempfile
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -253,7 +252,6 @@ def test_check_ytdlp_cli_found():
 
 def test_check_ytdlp_python_package():
     from ml_pipeline.preprocess import _check_ytdlp
-    import sys
     mock_yt_dlp = MagicMock()
     with patch("shutil.which", return_value=None), \
          patch.dict("sys.modules", {"yt_dlp": mock_yt_dlp}):
@@ -347,7 +345,6 @@ def test_separate_guitar_cache_hit(tmp_path):
 
 def test_download_ytdlp_python_mode(tmp_path):
     """_download_audio_ytdlp: python mode calls YoutubeDL."""
-    import sys
     from ml_pipeline.preprocess import _download_audio_ytdlp
 
     mock_info = {"title": "Test Song", "uploader": "Artist", "duration": 180}
@@ -374,7 +371,6 @@ def test_download_ytdlp_python_mode(tmp_path):
 
 def test_download_ytdlp_python_mode_with_trimming(tmp_path):
     """_download_audio_ytdlp: python mode passes start_sec/duration_sec."""
-    import sys
     from ml_pipeline.preprocess import _download_audio_ytdlp
 
     mock_info = {"title": "T", "uploader": "U", "duration": 30}

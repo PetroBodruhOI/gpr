@@ -3,17 +3,13 @@
 import csv
 import os
 import pickle
-import tempfile
-from collections import Counter
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import numpy as np
 import pytest
 
 from ml_pipeline.classify import (
     FEATURE_KEYS,
-    QUIET_THRESHOLD,
-    SUPPORTED,
     _brier_multiclass,
     _ece_top_label,
     _normalized,
