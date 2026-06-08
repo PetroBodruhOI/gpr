@@ -6,9 +6,9 @@ interface Props {
 }
 
 const SIZES = {
-  sm: { cell: "w-7 h-10", icon: "text-base", label: "text-[10px]" },
-  md: { cell: "w-9 h-14", icon: "text-xl",  label: "text-xs"     },
-  lg: { cell: "w-12 h-16", icon: "text-2xl", label: "text-sm"     },
+  sm: { cell: "w-6 h-9",                                    gap: "gap-0.5",          icon: "text-sm",             label: "text-[9px]"             },
+  md: { cell: "w-7 h-10 sm:w-9 sm:h-14",                   gap: "gap-0.5 sm:gap-1", icon: "text-base sm:text-xl", label: "text-[10px] sm:text-xs" },
+  lg: { cell: "w-7 h-11 sm:w-10 sm:h-14 md:w-12 md:h-16", gap: "gap-0.5 sm:gap-1", icon: "text-lg sm:text-2xl",  label: "text-[11px] sm:text-sm" },
 };
 
 function StrumIcon({ kind, sizeClass }: { kind: StrumStep; sizeClass: string }) {
@@ -26,7 +26,7 @@ function StrumGrid({ steps, size }: { steps: StrumStep[]; size: "sm" | "md" | "l
   const beatLabels = ["1", "&", "2", "&", "3", "&", "4", "&"];
 
   return (
-    <div className="flex gap-1 justify-center">
+    <div className={`flex ${s.gap} justify-center`}>
       {steps.map((step, i) => (
         <div key={i} className="flex flex-col items-center">
           <div className={`${s.label} text-white/40 mb-1 font-mono`}>
@@ -89,8 +89,9 @@ function ArpStepBox({ step, size }: { step: ArpStep; size: "sm" | "md" | "lg" })
 }
 
 function ArpGrid({ steps, size }: { steps: ArpStep[]; size: "sm" | "md" | "lg" }) {
+  const s = SIZES[size];
   return (
-    <div className="flex gap-1 justify-center flex-wrap">
+    <div className={`flex ${s.gap} justify-center flex-wrap`}>
       {steps.map((step, i) => (
         <ArpStepBox key={i} step={step} size={size} />
       ))}

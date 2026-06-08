@@ -104,13 +104,13 @@ function TimelineTable({
         </span>
       </h3>
       <div className="overflow-x-auto rounded-lg border border-white/5">
-        <table className="w-full text-sm">
+        <table className="w-full text-xs sm:text-sm">
           <thead>
             <tr className="bg-slate-900/40 border-b border-white/5">
-              <th className="px-4 py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">#</th>
-              <th className="px-4 py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">Час</th>
-              <th className="px-4 py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">Патерн</th>
-              <th className="px-4 py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">Впевн.</th>
+              <th className="hidden sm:table-cell px-4 py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">#</th>
+              <th className="px-2 sm:px-4 py-2 sm:py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">Час</th>
+              <th className="px-2 sm:px-4 py-2 sm:py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">Патерн</th>
+              <th className="px-2 sm:px-4 py-2 sm:py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">Впевн.</th>
             </tr>
           </thead>
           <tbody>
@@ -119,13 +119,13 @@ function TimelineTable({
                 key={c.chunk_idx}
                 className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
               >
-                <td className="px-4 py-3 text-white/40 font-mono">{c.chunk_idx}</td>
-                <td className="px-4 py-3 text-white/70 font-mono">
-                  {c.time_start.toFixed(1)}с – {c.time_end.toFixed(1)}с
+                <td className="hidden sm:table-cell px-4 py-3 text-white/40 font-mono">{c.chunk_idx}</td>
+                <td className="px-2 sm:px-4 py-2 sm:py-3 text-white/70 font-mono">
+                  {c.time_start.toFixed(1)}–{c.time_end.toFixed(1)}с
                 </td>
-                <td className="px-4 py-3 font-medium text-white">{c.label}</td>
-                <td className="px-4 py-3">
-                  <span className="inline-block px-2.5 py-1 rounded-md text-xs font-semibold"
+                <td className="px-2 sm:px-4 py-2 sm:py-3 font-medium text-white">{c.label}</td>
+                <td className="px-2 sm:px-4 py-2 sm:py-3">
+                  <span className="inline-block px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md text-xs font-semibold"
                         style={{
                           background: "rgba(234, 179, 8, 0.12)",
                           color: "#fde047",
@@ -215,7 +215,7 @@ function PatternCard({
       style={isPrimary ? undefined : { background: "rgba(10, 20, 36, 0.5)" }}
     >
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mb-3">
-        <div className={isPrimary ? "text-3xl md:text-4xl font-bold text-white" : "text-2xl font-bold text-white"}>
+        <div className={isPrimary ? "text-2xl sm:text-3xl md:text-4xl font-bold text-white" : "text-xl sm:text-2xl font-bold text-white"}>
           {pattern ? pattern.name : label}
         </div>
         {pattern && (

@@ -109,10 +109,10 @@ export default function App() {
         </div>
       </header>
 
-      <div className={`relative ${containerWidth} mx-auto py-12 px-4`}>
+      <div className={`relative ${containerWidth} mx-auto py-6 sm:py-12 px-4`}>
         {/* Title block */}
-        <div className="mb-10 text-center">
-          <h1 className="text-5xl md:text-6xl font-bold text-white mb-5 leading-tight tracking-tight">
+        <div className="mb-6 sm:mb-10 text-center">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold text-white mb-4 sm:mb-5 leading-tight tracking-tight">
             Guitar Pattern
             <br />
             <span className="gradient-text">Recommender</span>

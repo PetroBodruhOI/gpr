@@ -35,10 +35,10 @@ export const PATTERNS: Record<string, Pattern> = {
   "8b": {
     kind: "strum",
     label: "8b",
-    name: "Бій ",
-    description: "D D U U U D U D u",
+    name: "Бій",
+    description: "D D U U U D U D",
     color: "#ec4899",   // pink
-    steps: ["D", "D", "U", "U", "U", "D", "U", "D", "u"],
+    steps: ["D", "D", "U", "U", "U", "D", "U", "D"],
   },
   "6a": {
     kind: "arp",
