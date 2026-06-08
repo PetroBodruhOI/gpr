@@ -30,6 +30,9 @@ class MockRedis:
     def setex(self, key, ttl, value):
         self.store[key] = value
 
+    def set(self, key, value):
+        self.store[key] = value
+
     def get(self, key):
         return self.store.get(key)
 
@@ -611,6 +614,254 @@ def test_yt_dlp_uses_16khz():
     # Must contain -ar 16000 in both modes (Python and CLI)
     assert '"-ar", "16000"' in source, \
         "yt-dlp must include -ar 16000 in ffmpeg postprocessor args"
+
+
+# ── Test: check_basic_auth ────────────────────────────────────────────────────
+
+def test_check_basic_auth_valid():
+    import base64
+    from app import check_basic_auth
+
+    creds = base64.b64encode(b"grafana:grafana123").decode()
+    # Should NOT raise
+    check_basic_auth(f"Basic {creds}")
+
+
+def test_check_basic_auth_none_raises_401():
+    from fastapi import HTTPException
+    from app import check_basic_auth
+
+    with pytest.raises(HTTPException) as exc:
+        check_basic_auth(None)
+    assert exc.value.status_code == 401
+
+
+def test_check_basic_auth_wrong_password():
+    import base64
+    from fastapi import HTTPException
+    from app import check_basic_auth
+
+    creds = base64.b64encode(b"grafana:wrongpass").decode()
+    with pytest.raises(HTTPException) as exc:
+        check_basic_auth(f"Basic {creds}")
+    assert exc.value.status_code == 401
+
+
+def test_check_basic_auth_wrong_scheme():
+    from fastapi import HTTPException
+    from app import check_basic_auth
+
+    with pytest.raises(HTTPException) as exc:
+        check_basic_auth("Bearer sometoken")
+    assert exc.value.status_code == 401
+
+
+def test_check_basic_auth_malformed():
+    from fastapi import HTTPException
+    from app import check_basic_auth
+
+    with pytest.raises(HTTPException) as exc:
+        check_basic_auth("notbase64!!!!")
+    assert exc.value.status_code == 401
+
+
+# ── Test: _load_model ─────────────────────────────────────────────────────────
+
+def test_load_model_from_local_file(tmp_path):
+    import pickle
+    from sklearn.pipeline import Pipeline
+    from sklearn.dummy import DummyClassifier
+    from app import _load_model
+
+    pipeline = Pipeline([("clf", DummyClassifier())])
+    bundle = {"pipeline": pipeline, "classes": ["6a", "6b"], "feature_keys": ["f1"]}
+    pkl = tmp_path / "model.pkl"
+    with open(str(pkl), "wb") as f:
+        pickle.dump(bundle, f)
+
+    with patch.dict(os.environ, {"MODEL_PATH": str(pkl)}):
+        result = _load_model()
+
+    assert result["classes"] == ["6a", "6b"]
+
+
+def test_load_model_no_file_no_env_raises():
+    from app import _load_model
+
+    with patch.dict(os.environ, {"MODEL_PATH": "/nonexistent/model.pkl",
+                                  "HF_MODEL_REPO": ""}):
+        os.environ.pop("HF_MODEL_REPO", None)
+        with pytest.raises((RuntimeError, Exception)):
+            _load_model()
+
+
+# ── Test: predict_url endpoint ────────────────────────────────────────────────
+
+def test_predict_url_queues_task(mock_redis):
+    from fastapi import BackgroundTasks
+    from app import predict_url, PredictUrlRequest
+
+    req = PredictUrlRequest(url="https://example.com/song")
+    bg = BackgroundTasks()
+
+    with patch("app.redis_client", mock_redis):
+        result = predict_url(req, bg)
+
+    assert "task_id" in result
+    task_id = result["task_id"]
+    stored = json.loads(mock_redis.get(f"task:{task_id}"))
+    assert stored["status"] == "pending"
+    assert stored["progress"] == 0
+
+
+def test_predict_url_with_optional_params(mock_redis):
+    from fastapi import BackgroundTasks
+    from app import predict_url, PredictUrlRequest
+
+    req = PredictUrlRequest(url="https://example.com/song",
+                            start_sec=10.0, duration_sec=30.0)
+    bg = BackgroundTasks()
+
+    with patch("app.redis_client", mock_redis):
+        result = predict_url(req, bg)
+
+    assert "task_id" in result
+
+
+# ── Test: run_predict (mocked pipeline) ───────────────────────────────────────
+
+def test_run_predict_file_success(mock_redis):
+    """run_predict: happy path — file input, full pipeline mocked."""
+    from app import run_predict
+
+    sr = 22050
+    y = np.random.randn(sr * 6).astype(np.float32)
+
+    mock_pipeline = MagicMock()
+    mock_pipeline.predict_proba.return_value = [np.array([0.85, 0.10, 0.05])]
+
+    bundle = {
+        "pipeline": mock_pipeline,
+        "classes": ["6a", "6b", "8a"],
+        "feature_keys": ["rms_mean"],
+    }
+
+    with patch("app.redis_client", mock_redis), \
+         patch("app.BUNDLE", bundle), \
+         patch("app.load_audio", return_value=(y, sr)), \
+         patch("app._file_beats",
+               return_value=(np.array([0.5, 1.0]), np.array([0.5]))), \
+         patch("app.split_audio_chunks",
+               return_value=[(y[:sr * 6], 0.0, 6.0)]), \
+         patch("app.extract_features", return_value={"rms_mean": 0.1}):
+        run_predict("task-file-1", audio_path="/fake/audio.wav")
+
+    stored = json.loads(mock_redis.get("task:task-file-1"))
+    assert stored["status"] == "done"
+    assert stored["result"]["final_label"] == "6a"
+    assert 0.0 <= stored["result"]["final_conf"] <= 1.0
+    assert stored["result"]["n_chunks"] == 1
+
+
+def test_run_predict_multiple_chunks(mock_redis):
+    """run_predict: soft voting over several chunks."""
+    from app import run_predict
+
+    sr = 22050
+    chunk = np.zeros(sr * 6, dtype=np.float32)
+
+    mock_pipeline = MagicMock()
+    mock_pipeline.predict_proba.side_effect = [
+        [np.array([0.7, 0.2, 0.1])],
+        [np.array([0.6, 0.3, 0.1])],
+        [np.array([0.8, 0.1, 0.1])],
+    ]
+
+    bundle = {
+        "pipeline": mock_pipeline,
+        "classes": ["6a", "6b", "8a"],
+        "feature_keys": ["rms_mean"],
+    }
+
+    chunks = [(chunk, 0.0, 6.0), (chunk, 4.2, 10.2), (chunk, 8.4, 14.4)]
+
+    with patch("app.redis_client", mock_redis), \
+         patch("app.BUNDLE", bundle), \
+         patch("app.load_audio", return_value=(chunk, sr)), \
+         patch("app._file_beats", return_value=(np.array([]), np.array([]))), \
+         patch("app.split_audio_chunks", return_value=chunks), \
+         patch("app.extract_features", return_value={"rms_mean": 0.1}):
+        run_predict("task-multi", audio_path="/fake/song.wav")
+
+    stored = json.loads(mock_redis.get("task:task-multi"))
+    assert stored["status"] == "done"
+    assert stored["result"]["n_chunks"] == 3
+    assert stored["result"]["final_label"] == "6a"
+
+
+def test_run_predict_demucs_error(mock_redis):
+    """run_predict: demucs failure → status='error'."""
+    from app import run_predict
+
+    with patch("app.redis_client", mock_redis), \
+         patch("app.load_audio", side_effect=RuntimeError("demucs failed")):
+        run_predict("task-err", audio_path="/fake/audio.wav")
+
+    stored = json.loads(mock_redis.get("task:task-err"))
+    assert stored["status"] == "error"
+    assert "Demucs" in stored["message"] or "demucs" in stored["message"].lower()
+
+
+def test_run_predict_url_download_error(mock_redis):
+    """run_predict: URL download failure → status='error'."""
+    from app import run_predict
+
+    with patch("app.redis_client", mock_redis), \
+         patch("app._download_audio_ytdlp",
+               side_effect=RuntimeError("network error")):
+        run_predict("task-url-err", url="https://example.com/song")
+
+    stored = json.loads(mock_redis.get("task:task-url-err"))
+    assert stored["status"] == "error"
+
+
+def test_run_predict_url_success(mock_redis, tmp_path):
+    """run_predict: URL path writes temp file and classifies."""
+    from app import run_predict
+    import soundfile as sf
+
+    sr = 22050
+    y = np.zeros(sr * 6, dtype=np.float32)
+
+    # Create a real temp wav so os.path.exists passes
+    tmp_wav = str(tmp_path / "audio.wav")
+    sf.write(tmp_wav, y, sr)
+
+    mock_pipeline = MagicMock()
+    mock_pipeline.predict_proba.return_value = [np.array([0.9, 0.05, 0.05])]
+
+    bundle = {
+        "pipeline": mock_pipeline,
+        "classes": ["6a", "6b", "8a"],
+        "feature_keys": ["rms_mean"],
+    }
+
+    def fake_download(url, path, **kwargs):
+        sf.write(path, y, sr)
+        return "Test Song", "Artist", 6
+
+    with patch("app.redis_client", mock_redis), \
+         patch("app.BUNDLE", bundle), \
+         patch("app._download_audio_ytdlp", side_effect=fake_download), \
+         patch("app.load_audio", return_value=(y, sr)), \
+         patch("app._file_beats", return_value=(np.array([]), np.array([]))), \
+         patch("app.split_audio_chunks", return_value=[(y, 0.0, 6.0)]), \
+         patch("app.extract_features", return_value={"rms_mean": 0.1}), \
+         patch("tempfile.mkdtemp", return_value=str(tmp_path)):
+        run_predict("task-url-ok", url="https://example.com/song")
+
+    stored = json.loads(mock_redis.get("task:task-url-ok"))
+    assert stored["status"] == "done"
 
 
 if __name__ == "__main__":

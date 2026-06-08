@@ -35,13 +35,9 @@ from prometheus_client import Counter, Histogram
 from pydantic import BaseModel
 from pythonjsonlogger import jsonlogger
 
-from simple_classify import (
-    _download_audio_ytdlp,
-    _file_beats,
-    extract_features,
-    load_audio,
-    split_audio_chunks,
-)
+from ml_pipeline.classify import split_audio_chunks
+from ml_pipeline.feature_extract import extract_features
+from ml_pipeline.preprocess import _download_audio_ytdlp, _file_beats, load_audio
 
 # ── Structured logging ────────────────────────────────────────────────
 
@@ -120,14 +116,34 @@ def _load_model() -> dict:
         return pickle.load(f)
 
 
+def _restore_feedback_counters() -> int:
+    restored = 0
+    try:
+        for key in redis_client.scan_iter("feedback:*"):
+            raw = redis_client.get(key)
+            if not raw:
+                continue
+            data = json.loads(raw)
+            cls = data.get("predicted_class", "unknown")
+            rating = data.get("rating")
+            if rating in ("good", "bad"):
+                FEEDBACK_TOTAL.labels(predicted_class=cls, rating=rating).inc()
+                restored += 1
+    except Exception as e:
+        logger.warning("feedback_restore_failed", extra={"error": str(e)})
+    return restored
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     global BUNDLE, redis_client
     redis_client = redis_lib.from_url(os.environ["REDIS_URL"])
     BUNDLE = _load_model()
+    restored = _restore_feedback_counters()
     logger.info("startup_complete", extra={
         "classes": BUNDLE["classes"],
         "n_features": len(BUNDLE["feature_keys"]),
+        "feedback_restored": restored,
     })
     yield
 
@@ -232,7 +248,11 @@ def run_predict(task_id: str, audio_path: Optional[str] = None,
         _set_progress(task_id, 30, "Виділяю гітарний стем (HTDemucs)…")
         t_demucs = time.perf_counter()
         try:
-            y, sr = load_audio(audio_path, use_demucs=True)  # sr=22050
+            def _demucs_cb(pct: int) -> None:
+                app_pct = 30 + int(pct * 25 / 100)  # maps 0-100 → 30-55
+                _set_progress(task_id, app_pct, f"HTDemucs: {pct}%…")
+
+            y, sr = load_audio(audio_path, use_demucs=True, progress_cb=_demucs_cb)  # sr=22050
         except Exception as e:
             _set_progress(task_id, 0, f"Demucs error: {e}", status="error")
             PREDICTIONS_TOTAL.labels(source=source, predicted_class="none",
@@ -250,7 +270,14 @@ def run_predict(task_id: str, audio_path: Optional[str] = None,
         # ── 3. BeatThis ──
         _set_progress(task_id, 55, "Аналізую ритм (BeatThis)…")
         t_beat = time.perf_counter()
-        beats, downbeats = _file_beats(audio_path, y, sr, use_beats=True)
+
+        def _beat_cb(elapsed_s: int) -> None:
+            # BeatThis typically takes 16-28s; cap at 69 so 70 means "done"
+            app_pct = min(69, 55 + int(elapsed_s * 14 / 24))
+            _set_progress(task_id, app_pct, f"Аналізую ритм… ({elapsed_s}с)")
+
+        beats, downbeats = _file_beats(audio_path, y, sr, use_beats=True,
+                                       progress_cb=_beat_cb)
         STAGE_DURATION.labels(stage="beat").observe(
             time.perf_counter() - t_beat
         )
@@ -270,8 +297,7 @@ def run_predict(task_id: str, audio_path: Optional[str] = None,
         for ci, (chunk_y, t_s, t_e) in enumerate(chunks):
             feat = extract_features(chunk_y, sr, beats=beats,
                                     downbeats=downbeats, chunk_offset=t_s)
-            vec = pd.DataFrame(
-                [[feat.get(k, 0.0) for k in feature_keys]],
+            vec = pd.DataFrame([[feat.get(k, 0.0) for k in feature_keys]],
                 columns=feature_keys,
             )
             probs = pipeline.predict_proba(vec)[0]
@@ -383,8 +409,7 @@ async def predict_file(file: UploadFile, bg: BackgroundTasks):
     task_id = str(uuid.uuid4())
     _set_progress(task_id, 0, "Queued", status="pending")
     bg.add_task(run_predict, task_id, audio_path=tmp_path, cleanup_dir=tmp_dir)
-    logger.info("predict_file_queued",
-                extra={"task_id": task_id, "file_name": filename})
+    logger.info("predict_file_queued",extra={"task_id": task_id, "file_name": filename})
     return {"task_id": task_id}
 
 
@@ -396,13 +421,10 @@ def get_task(task_id: str):
                 "progress": 0, "message": ""}
     return {"task_id": task_id, **json.loads(raw)}
 
-
 @app.post("/feedback/{task_id}")
 def submit_feedback(task_id: str, req: FeedbackRequest):
     if req.rating not in ("good", "bad"):
-        raise HTTPException(status_code=400,
-                            detail="rating must be 'good' or 'bad'")
-
+        raise HTTPException(status_code=400, detail="rating must be 'good' or 'bad'")
     raw = redis_client.get(f"task:{task_id}")
     if raw is None:
         raise HTTPException(status_code=404, detail="task not found")
@@ -411,16 +433,10 @@ def submit_feedback(task_id: str, req: FeedbackRequest):
 
     FEEDBACK_TOTAL.labels(predicted_class=predicted_class,
                           rating=req.rating).inc()
-    # Persist for later analysis (30-day TTL).
-    redis_client.setex(f"feedback:{task_id}", 86400 * 30, json.dumps({
+    redis_client.set(f"feedback:{task_id}", json.dumps({
         "task_id": task_id,
         "predicted_class": predicted_class,
         "rating": req.rating,
         "ts": time.time(),
     }))
-    logger.info("user_feedback", extra={
-        "task_id": task_id,
-        "predicted_class": predicted_class,
-        "rating": req.rating,
-    })
     return {"ok": True, "task_id": task_id, "rating": req.rating}

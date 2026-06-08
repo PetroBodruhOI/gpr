@@ -50,6 +50,7 @@ export async function getTask(taskId: string): Promise<TaskStatus> {
   return data;
 }
 
+// frontend/src/api/client.ts
 /** Polling кожні 1.5 сек, поки статус не done/error. */
 export async function pollTask(
   taskId: string,

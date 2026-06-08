@@ -13,7 +13,7 @@ vi.mock("axios", () => ({
 }));
 
 // Import AFTER the mock so client picks up the mocked axios
-const { pollTask } = await import("./client");
+const { pollTask, predictUrl, predictFile, submitFeedback } = await import("./client");
 import type { TaskStatus } from "./client";
 
 const status = (overrides: Partial<TaskStatus> = {}): TaskStatus => ({
@@ -22,6 +22,73 @@ const status = (overrides: Partial<TaskStatus> = {}): TaskStatus => ({
   progress: 50,
   message: "working",
   ...overrides,
+});
+
+describe("predictUrl", () => {
+  beforeEach(() => mockPost.mockReset());
+
+  it("posts to /predict/url and returns task_id", async () => {
+    mockPost.mockResolvedValueOnce({ data: { task_id: "url-task-1" } });
+
+    const id = await predictUrl("https://example.com/song");
+
+    expect(mockPost).toHaveBeenCalledWith("/predict/url", {
+      url: "https://example.com/song",
+      start_sec: undefined,
+      duration_sec: undefined,
+    });
+    expect(id).toBe("url-task-1");
+  });
+
+  it("passes start_sec and duration_sec when provided", async () => {
+    mockPost.mockResolvedValueOnce({ data: { task_id: "url-task-2" } });
+
+    await predictUrl("https://example.com/song", 10, 30);
+
+    expect(mockPost).toHaveBeenCalledWith("/predict/url", {
+      url: "https://example.com/song",
+      start_sec: 10,
+      duration_sec: 30,
+    });
+  });
+});
+
+describe("predictFile", () => {
+  beforeEach(() => mockPost.mockReset());
+
+  it("posts to /predict/file with FormData and returns task_id", async () => {
+    mockPost.mockResolvedValueOnce({ data: { task_id: "file-task-1" } });
+
+    const file = new File(["audio"], "test.mp3", { type: "audio/mpeg" });
+    const id = await predictFile(file);
+
+    expect(mockPost).toHaveBeenCalledTimes(1);
+    const [url, body] = mockPost.mock.calls[0];
+    expect(url).toBe("/predict/file");
+    expect(body).toBeInstanceOf(FormData);
+    expect((body as FormData).get("file")).toBe(file);
+    expect(id).toBe("file-task-1");
+  });
+});
+
+describe("submitFeedback", () => {
+  beforeEach(() => mockPost.mockReset());
+
+  it("posts to /feedback/:taskId with the rating", async () => {
+    mockPost.mockResolvedValueOnce({});
+
+    await submitFeedback("task-99", "good");
+
+    expect(mockPost).toHaveBeenCalledWith("/feedback/task-99", { rating: "good" });
+  });
+
+  it("resolves without a return value", async () => {
+    mockPost.mockResolvedValueOnce({});
+
+    const result = await submitFeedback("task-99", "bad");
+
+    expect(result).toBeUndefined();
+  });
 });
 
 describe("pollTask", () => {

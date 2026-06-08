@@ -17,13 +17,18 @@ export default function UploadForm({ onStart }: Props) {
     "audio/mp3",
     "audio/ogg",
     "audio/flac",
+    "audio/mp4",       // iPhone .m4a
+    "audio/x-m4a",    // iPhone .m4a (альтернативний MIME)
+    "audio/aac",
+    "video/mp4",       // iPhone HEVC відео
+    "video/quicktime", // iPhone .mov
   ];
 
   const validateFile = (f: File | null): boolean => {
     if (!f) return false;
 
     if (!allowed.includes(f.type)) {
-      setError("Підтримуються лише аудіофайли MP3, WAV, OGG, FLAC");
+      setError("Підтримуються аудіофайли MP3, WAV, OGG, FLAC, M4A та відео MP4, MOV");
       setFile(null);
       return false;
     }
@@ -135,17 +140,17 @@ export default function UploadForm({ onStart }: Props) {
                 ? "Відпустіть, щоб завантажити"
                 : file
                 ? file.name
-                : "Перетягніть аудіофайл або натисніть, щоб вибрати"}
+                : "Перетягніть аудіо або відео або натисніть, щоб вибрати"}
             </p>
 
             <p className="text-white/40 text-xs">
-              MP3 · WAV · OGG · FLAC
+              MP3 · WAV · OGG · FLAC · M4A · MP4 · MOV
             </p>
           </div>
 
           <input
             type="file"
-            accept=".mp3,.wav,.ogg,.flac,audio/*"
+            accept=".mp3,.wav,.ogg,.flac,.m4a,.aac,.mp4,.mov,audio/*,video/*"
             disabled={busy}
             className="hidden"
             onChange={(e) => {
