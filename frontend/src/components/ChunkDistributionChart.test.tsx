@@ -84,8 +84,8 @@ describe("ChunkDistributionChart", () => {
 
   it("renders known pattern name in legend for recognised class", () => {
     render(<ChunkDistributionChart chunks={CHUNKS} />);
-    // "6a" maps to "Арпеджіо 1" in PATTERNS
-    expect(screen.getAllByText("Арпеджіо 1").length).toBeGreaterThan(0);
+    // "6a" maps to "Шестидольне арпеджіо" in PATTERNS
+    expect(screen.getAllByText("Шестидольне арпеджіо").length).toBeGreaterThan(0);
   });
 
   it("handles empty chunks array without crashing", () => {
