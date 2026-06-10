@@ -94,6 +94,9 @@ jobs:
         with: { node-version: "20" }
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./frontend
       - name: Pull Vercel environment
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
         working-directory: ./frontend
