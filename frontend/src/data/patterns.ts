@@ -19,7 +19,7 @@ export const PATTERNS: Record<string, Pattern> = {
   "6b": {
     kind: "strum",
     label: "6b",
-    name: "Бій",
+    name: "Класичний бій",
     description: "D - D U - U D U",
     color: "#facc15",   // yellow
     steps: ["D", "-", "D", "U", "-", "U", "D", "U"],
@@ -27,7 +27,7 @@ export const PATTERNS: Record<string, Pattern> = {
   "6x": {
     kind: "strum",
     label: "6x",
-    name: "Бій (із заглушкою)",
+    name: "Бій з заглушуванням",
     description: "D - X U - U X U",
     color: "#f97316",   // orange
     steps: ["D", "-", "X", "U", "-", "U", "X", "U"],
@@ -35,7 +35,7 @@ export const PATTERNS: Record<string, Pattern> = {
   "8b": {
     kind: "strum",
     label: "8b",
-    name: "Бій",
+    name: "Розгорнутий бій",
     description: "D D U U U D U D",
     color: "#ec4899",   // pink
     steps: ["D", "D", "U", "U", "U", "D", "U", "D"],
@@ -43,7 +43,7 @@ export const PATTERNS: Record<string, Pattern> = {
   "6a": {
     kind: "arp",
     label: "6a",
-    name: "Арпеджіо 1",
+    name: "Шестидольне арпеджіо",
     description: "b 3 2 1 2 3",
     color: "#10b981",   // emerald
     steps: [
@@ -58,7 +58,7 @@ export const PATTERNS: Record<string, Pattern> = {
   "8a": {
     kind: "arp",
     label: "8a",
-    name: "Арпеджіо 2",
+    name: "Восьмидольне арпеджіо",
     description: "b 3 2 3 1 3 2 3",
     color: "#06b6d4",   // cyan
     steps: [
@@ -75,7 +75,7 @@ export const PATTERNS: Record<string, Pattern> = {
   "wa": {
     kind: "arp",
     label: "wa",
-    name: "Арпеджіо з акордом",
+    name: "Вальсове арпеджіо",
     description: "b 2+3+4 2+3+4",
     color: "#3b82f6",   // blue
     steps: [

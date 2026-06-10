@@ -39,3 +39,5 @@ htmlcov/
 .coverage
 .coverage.*
 coverage.xml
+.vercel
+.env*
