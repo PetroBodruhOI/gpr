@@ -245,11 +245,11 @@ def run_predict(task_id: str, audio_path: Optional[str] = None,
 
         # ── 2. Demucs ──
         # NOTE: Audio is resampled to 22050 Hz for model compatibility
-        _set_progress(task_id, 30, "Виділяю гітарний стем (HTDemucs)…")
+        _set_progress(task_id, 5, "Виділяю гітарний стем (HTDemucs)…")
         t_demucs = time.perf_counter()
         try:
             def _demucs_cb(pct: int) -> None:
-                app_pct = 30 + int(pct * 25 / 100)  # maps 0-100 → 30-55
+                app_pct = 5 + int(pct * 25 / 100)  # maps 0-100 → 5-30
                 _set_progress(task_id, app_pct, f"HTDemucs: {pct}%…")
 
             y, sr = load_audio(audio_path, use_demucs=True, progress_cb=_demucs_cb)  # sr=22050
