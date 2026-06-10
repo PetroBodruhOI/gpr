@@ -27,17 +27,18 @@ describe("pickRecommendations", () => {
     }
   });
 
-  it("filters out classes below chance level (1/n)", () => {
+  it("filters out classes below 25% threshold", () => {
     const recs = pickRecommendations({
       "6a": 0.40, "6b": 0.30, "8a": 0.20, "8b": 0.10,
     });
-    // Chance = 1/4 = 0.25, so 8a (0.20) and 8b (0.10) excluded
-    expect(recs.every((r) => r.prob > 0.25)).toBe(true);
+    // 8a (0.20) and 8b (0.10) are below 0.25 → excluded
+    expect(recs.every((r) => r.prob >= 0.25)).toBe(true);
+    expect(recs.map((r) => r.label)).toEqual(["6a", "6b"]);
   });
 
   it("caps results at 3 candidates", () => {
     const recs = pickRecommendations({
-      "a": 0.20, "b": 0.19, "c": 0.18, "d": 0.17, "e": 0.16, "f": 0.10,
+      "a": 0.30, "b": 0.28, "c": 0.26, "d": 0.25, "e": 0.25, "f": 0.10,
     });
     expect(recs.length).toBeLessThanOrEqual(3);
   });

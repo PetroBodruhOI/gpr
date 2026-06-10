@@ -173,6 +173,7 @@ function TimelineTable({
 }
 
 const HIGH_CONFIDENCE_THRESHOLD = 0.75;     // 75%
+const MIN_SHOW_THRESHOLD = 0.25;             // 25%
 const MAX_ALT_RECOMMENDATIONS = 3;
 
 export function pickRecommendations(
@@ -188,11 +189,10 @@ export function pickRecommendations(
     return [sorted[0]];
   }
 
-  // Low confidence → all classes above chance level (1 / n_classes),
+  // Low confidence → all classes with at least 25% confidence,
   // capped at MAX_ALT_RECOMMENDATIONS.
-  const chance = 1 / sorted.length;
   return sorted
-    .filter((s) => s.prob > chance)
+    .filter((s) => s.prob >= MIN_SHOW_THRESHOLD)
     .slice(0, MAX_ALT_RECOMMENDATIONS);
 }
 
@@ -223,7 +223,7 @@ function PatternCard({
         )}
         <span className="ml-auto flex items-baseline gap-1">
           <span className="text-xl font-semibold text-yellow-300">{pct.toFixed(1)}%</span>
-          <span className="text-white/50 text-sm">релевантність</span>
+          <span className="text-white/50 text-sm">впевненість</span>
         </span>
       </div>
 
@@ -264,7 +264,7 @@ export default function ResultCard({ result, taskId }: Props) {
             </svg>
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-white">
+            <h2 className={`text-xl font-semibold ${isHighConf ? "text-white" : "text-yellow-300"}`}>
               {isHighConf ? "Рекомендований патерн" : "Можливі патерни"}
             </h2>
             <p className="text-white/50 text-sm">
