@@ -1,7 +1,6 @@
 __pycache__/
-*.pyc
-.env
-.cache/
 _demucs_cache/
 _beats_cache/
+audio/
+features.csv
 model.pkl

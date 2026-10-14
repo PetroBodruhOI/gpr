@@ -92,6 +92,34 @@ describe("UploadForm", () => {
     await vi.waitFor(() => expect(onStart).toHaveBeenCalledWith("task-123"));
   });
 
+  it("rejects files larger than 100 MB", async () => {
+    const user = userEvent.setup();
+    render(<UploadForm onStart={vi.fn()} />);
+
+    const big = makeAudioFile("big.wav", "audio/wav");
+    Object.defineProperty(big, "size", { value: 100 * 1024 * 1024 + 1 });
+    const input = document.querySelector("input[type=file]") as HTMLInputElement;
+    await user.upload(input, big);
+
+    expect(screen.getByText(/Файл завеликий/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Підібрати патерн/ })).toBeDisabled();
+  });
+
+  it("shows an error and does not start when upload fails", async () => {
+    const user = userEvent.setup();
+    const onStart = vi.fn();
+    mockPredictFile.mockRejectedValue(new Error("Network Error"));
+
+    render(<UploadForm onStart={onStart} />);
+
+    const input = document.querySelector("input[type=file]") as HTMLInputElement;
+    await user.upload(input, makeAudioFile());
+    await user.click(screen.getByRole("button", { name: /Підібрати патерн/ }));
+
+    expect(await screen.findByText(/Не вдалося завантажити файл/)).toBeInTheDocument();
+    expect(onStart).not.toHaveBeenCalled();
+  });
+
   it("shows 'Обробка' label while submitting", async () => {
     const user = userEvent.setup();
     let resolve!: (v: string) => void;

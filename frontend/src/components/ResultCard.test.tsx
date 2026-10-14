@@ -43,6 +43,13 @@ describe("pickRecommendations", () => {
     expect(recs.length).toBeLessThanOrEqual(3);
   });
 
+  it("falls back to the top class when every class is below 25%", () => {
+    const recs = pickRecommendations({
+      "6a": 0.20, "6b": 0.18, "8a": 0.17, "8b": 0.16, "wa": 0.15, "6x": 0.14,
+    });
+    expect(recs).toEqual([{ label: "6a", prob: 0.20 }]);
+  });
+
   it("handles empty probs gracefully", () => {
     expect(pickRecommendations({})).toEqual([]);
   });
