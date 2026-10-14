@@ -1,5 +1,5 @@
 # Local development stack — runs the same code that production uses.
-# Production: frontend → Vercel, hf_space → HuggingFace Space, Redis → Upstash.
+# Production: frontend → Vercel, backend → HuggingFace Space, Redis → Upstash.
 # Locally we replace Vercel/HF/Upstash with Docker containers but the apps themselves are identical.
 
 services:
@@ -15,7 +15,7 @@ services:
 
   worker:
     build:
-      context: ./hf_space
+      context: ./backend
       dockerfile: Dockerfile
     environment:
       REDIS_URL: redis://redis:6379/0
@@ -25,7 +25,7 @@ services:
     ports:
       - "7860:7860"
     volumes:
-      - ./hf_space:/app                       # live code reload
+      - ./backend:/app                       # live code reload
       - torch-cache:/app/.cache/torch         # keep pre-downloaded htdemucs_6s
       - hf-cache:/root/.cache/huggingface     # keep downloaded model.pkl
     depends_on:

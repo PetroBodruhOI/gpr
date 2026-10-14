@@ -190,10 +190,11 @@ export function pickRecommendations(
   }
 
   // Low confidence → all classes with at least 25% confidence,
-  // capped at MAX_ALT_RECOMMENDATIONS.
-  return sorted
+  // capped at MAX_ALT_RECOMMENDATIONS. Always show at least the top class.
+  const candidates = sorted
     .filter((s) => s.prob >= MIN_SHOW_THRESHOLD)
     .slice(0, MAX_ALT_RECOMMENDATIONS);
+  return candidates.length > 0 ? candidates : [sorted[0]];
 }
 
 function PatternCard({

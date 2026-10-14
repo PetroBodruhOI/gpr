@@ -29,13 +29,6 @@ export interface PredictResult {
   n_chunks: number;
 }
 
-export async function predictUrl(url: string,
-                                 start_sec?: number,
-                                 duration_sec?: number): Promise<string> {
-  const { data } = await api.post("/predict/url", { url, start_sec, duration_sec });
-  return data.task_id;
-}
-
 export async function predictFile(file: File): Promise<string> {
   const fd = new FormData();
   fd.append("file", file);
@@ -50,7 +43,6 @@ export async function getTask(taskId: string): Promise<TaskStatus> {
   return data;
 }
 
-// frontend/src/api/client.ts
 /** Polling кожні 1.5 сек, поки статус не done/error. */
 export async function pollTask(
   taskId: string,

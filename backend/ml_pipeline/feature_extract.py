@@ -1,5 +1,5 @@
 """
-ML pipeline — librosa feature extraction (46 ознак: 25 librosa + 21 beat).
+Per-chunk feature extraction: 25 librosa features + 21 beat-grid features = 46.
 """
 
 import librosa
@@ -43,7 +43,7 @@ FEATURE_KEYS = LIBROSA_KEYS + BEAT_KEYS  # 25 + 21 = 46
 
 # ─── Librosa features ────────────────────────────────────────────────────────
 
-def extract_librosa_features(y: np.ndarray, sr: int = 22050) -> dict:
+def extract_librosa_features(y: np.ndarray, sr: int) -> dict:
     hop = 256
 
     # Energy
@@ -232,6 +232,3 @@ def extract_features(y, sr, beats=None, downbeats=None, chunk_offset=0.0):
         feats.update(_default_beat_feats())
     return feats
 
-
-def to_vec(feat_dict: dict) -> np.ndarray:
-    return np.array([feat_dict[k] for k in FEATURE_KEYS], dtype=np.float32)

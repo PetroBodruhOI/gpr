@@ -133,7 +133,7 @@ export default function App() {
             {!isTaskRunning && (
               <div ref={formRef} className="scroll-mt-24">
                 <div className="card mb-6">
-                  {<UploadForm onStart={handleTaskStart} />}
+                  <UploadForm onStart={handleTaskStart} />
                 </div>
               </div>
             )}

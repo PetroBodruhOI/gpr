@@ -5,6 +5,9 @@ interface Props {
   onStart: (taskId: string) => void;
 }
 
+// Keep in sync with MAX_UPLOAD_MB on the backend.
+const MAX_UPLOAD_MB = 100;
+
 export default function UploadForm({ onStart }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -33,6 +36,12 @@ export default function UploadForm({ onStart }: Props) {
       return false;
     }
 
+    if (f.size > MAX_UPLOAD_MB * 1024 * 1024) {
+      setError(`Файл завеликий — максимум ${MAX_UPLOAD_MB} МБ`);
+      setFile(null);
+      return false;
+    }
+
     setError("");
     setFile(f);
     return true;
@@ -51,6 +60,8 @@ export default function UploadForm({ onStart }: Props) {
     try {
       const taskId = await predictFile(file);
       onStart(taskId);
+    } catch {
+      setError("Не вдалося завантажити файл. Спробуйте ще раз.");
     } finally {
       setBusy(false);
     }
@@ -144,7 +155,7 @@ export default function UploadForm({ onStart }: Props) {
             </p>
 
             <p className="text-white/40 text-xs">
-              MP3 · WAV · OGG · FLAC · M4A · MP4 · MOV
+              MP3 · WAV · OGG · FLAC · M4A · MP4 · MOV · до {MAX_UPLOAD_MB} МБ
             </p>
           </div>
 
