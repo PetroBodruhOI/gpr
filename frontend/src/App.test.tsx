@@ -1,57 +1,54 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, render, screen } from "@testing-library/react";
 import App from "./App";
 
-// scrollIntoView is not implemented in jsdom — stub it.
-// Restore between tests so spies are fresh.
-const originalScrollIntoView = Element.prototype.scrollIntoView;
+const go = (hash: string) =>
+  act(() => {
+    window.location.hash = hash;
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+  });
+
 beforeEach(() => {
-  Element.prototype.scrollIntoView = vi.fn();
+  window.location.hash = "";
+  window.scrollTo = vi.fn() as never;
 });
 afterEach(() => {
-  Element.prototype.scrollIntoView = originalScrollIntoView;
+  window.location.hash = "";
 });
 
-describe("App", () => {
-  it("opens on 'Аналіз' view by default (URL form visible)", () => {
+describe("App routing", () => {
+  it("opens on the home page with the explainer and an upload form", () => {
     render(<App />);
+    expect(screen.getByRole("heading", { level: 1, name: /Почуй пісню/ })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Анімація/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Підібрати патерн/ })).toBeInTheDocument();
   });
 
-  it("renders sticky header with both nav items", () => {
+  it("has links to all three pages and marks the current one", () => {
     render(<App />);
-    // CTA button "Аналіз" in header (there are two: header CTA + body controls)
-    expect(screen.getAllByRole("button", { name: /Аналіз/ }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: /Список патернів/ })).toBeInTheDocument();
+    const nav = screen.getByRole("navigation");
+    expect(nav.querySelector('a[href="#/"]')).toHaveAttribute("aria-current", "page");
+    expect(nav.querySelector('a[href="#/patterns"]')).toBeInTheDocument();
+    expect(nav.querySelector('a[href="#/detect"]')).toBeInTheDocument();
   });
 
-  it("switches to patterns view when 'Список патернів' clicked", async () => {
-    const user = userEvent.setup();
+  it("shows the patterns page on #/patterns", () => {
     render(<App />);
-
-    await user.click(screen.getByRole("button", { name: /Список патернів/ }));
-
-    // Patterns view shows section headings (h2). Pattern names are h3 so narrow by level.
+    go("#/patterns");
     expect(screen.getByRole("heading", { level: 2, name: /Бої/ })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: /Арпеджіо/ })).toBeInTheDocument();
-    // Analyze form no longer mounted
-    expect(screen.queryByRole("button", { name: /Посилання на YouTube/ })).not.toBeInTheDocument();
   });
 
-  it("returns to analyze view + scrolls to form when header CTA clicked", async () => {
-    const user = userEvent.setup();
+  it("shows the detect page on #/detect", () => {
     render(<App />);
+    go("#/detect");
+    expect(screen.getByRole("heading", { level: 1, name: "Визначити патерн" })).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: /Анімація/ })).not.toBeInTheDocument();
+  });
 
-    // First switch away from analyze
-    await user.click(screen.getByRole("button", { name: /Список патернів/ }));
-    expect(screen.queryByRole("button", { name: /Посилання на YouTube/ })).not.toBeInTheDocument();
-
-    // Click the header CTA "Аналіз" — there's exactly one button named "Аналіз" while on patterns view
-    const ctas = screen.getAllByRole("button", { name: /Аналіз/ });
-    await user.click(ctas[0]);
-
-    await waitFor(() => {
-      expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
-    });
+  it("falls back to home for an unknown hash", () => {
+    render(<App />);
+    go("#/nope");
+    expect(screen.getByRole("heading", { level: 1, name: /Почуй пісню/ })).toBeInTheDocument();
   });
 });

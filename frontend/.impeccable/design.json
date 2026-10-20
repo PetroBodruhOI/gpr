@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-20T23:30:00Z",
+  "title": "Design System: GPR — Ватра",
+  "extensions": {
+    "colorMeta": {
+      "night": { "role": "neutral", "displayName": "Night", "tonalRamp": ["#0d0a08", "#171310", "#221c17", "#2a221c", "#3a2f26", "#5a4a3d", "#8a7867", "#c9bba7"] },
+      "coal": { "role": "neutral", "displayName": "Coal" },
+      "ember-ash": { "role": "neutral", "displayName": "Ember Ash" },
+      "ember": { "role": "primary", "displayName": "Ember", "tonalRamp": ["#5c2405", "#8a3609", "#b8480d", "#e05f12", "#ff7a1a", "#ff9142", "#ffb07a", "#ffd6b8"] },
+      "amber-glow": { "role": "secondary", "displayName": "Amber Glow", "tonalRamp": ["#5c3a05", "#8a5809", "#b8760d", "#e0951a", "#ffb347", "#ffc46e", "#ffd699", "#ffeacc"] },
+      "smoke": { "role": "neutral", "displayName": "Smoke" },
+      "pattern-6b": { "role": "data", "displayName": "Класичний бій" },
+      "pattern-6x": { "role": "data", "displayName": "Бій з заглушуванням" },
+      "pattern-8b": { "role": "data", "displayName": "Розгорнутий бій" },
+      "pattern-6a": { "role": "data", "displayName": "Шестидольне арпеджіо" },
+      "pattern-8a": { "role": "data", "displayName": "Восьмидольне арпеджіо" },
+      "pattern-wa": { "role": "data", "displayName": "Вальсове арпеджіо" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Page headlines (hero, page titles)." },
+      "headline": { "displayName": "Headline", "purpose": "Section headings." },
+      "title": { "displayName": "Title", "purpose": "Card and stage headings." },
+      "label": { "displayName": "Lane label", "purpose": "Uppercase tracked labels inside the pipeline stage only." }
+    },
+    "shadows": [
+      { "name": "transient-glow", "value": "0 0 18px rgba(255, 122, 26, 0.7)", "purpose": "A guitar transient igniting in the stage; the only glow in the system." }
+    ],
+    "motion": [
+      { "name": "ease-out", "value": "cubic-bezier(0.23, 1, 0.32, 1)", "purpose": "Press feedback, entrances, reveals." },
+      { "name": "press", "value": "transform 160ms ease-out, scale(0.97)", "purpose": "Every pressable control." },
+      { "name": "stage-loop", "value": "4s linear infinite", "purpose": "The pipeline stage clock: playhead sweep, transient ignite, arrow strike." },
+      { "name": "reveal", "value": "opacity/transform 600ms ease-out, translateY(16px) → 0, once", "purpose": "Home sections entering the viewport." },
+      { "name": "enter", "value": "320ms ease-out, translateY(8px), stagger 60ms", "purpose": "Result blocks appearing once." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one action per view: upload, Визначити патерн.",
+      "html": "<button class=\"ds-btn-primary\">Підібрати патерн <svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14M13 6l6 6-6 6\"/></svg></button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:8px;background:#ff7a1a;color:#171310;font-family:'Golos Text',system-ui,sans-serif;font-weight:600;padding:12px 24px;border:0;border-radius:9999px;cursor:pointer;transition:background-color 150ms ease,transform 160ms cubic-bezier(.23,1,.32,1)}.ds-btn-primary:hover{background:#ff9142}.ds-btn-primary:active{transform:scale(.97)}.ds-btn-primary:focus-visible{outline:2px solid #ffb347;outline-offset:2px}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Secondary navigation: Усі патерни, Аналізувати інший трек.",
+      "html": "<button class=\"ds-btn-secondary\">Усі патерни</button>",
+      "css": ".ds-btn-secondary{background:rgba(244,234,217,.05);color:rgba(244,234,217,.85);border:1px solid rgba(244,234,217,.15);font-family:'Golos Text',system-ui,sans-serif;font-weight:600;padding:10px 20px;border-radius:9999px;cursor:pointer;transition:background-color 150ms ease,transform 160ms cubic-bezier(.23,1,.32,1)}.ds-btn-secondary:hover{background:rgba(244,234,217,.09);color:#f4ead9}.ds-btn-secondary:active{transform:scale(.97)}.ds-btn-secondary:focus-visible{outline:2px solid #ffb347;outline-offset:2px}"
+    },
+    {
+      "name": "Navigation",
+      "kind": "nav",
+      "description": "Sticky header: logo, two text links, ember CTA pill.",
+      "html": "<nav class=\"ds-nav\"><span class=\"ds-logo\">GPR</span><a class=\"ds-link ds-on\">Головна</a><a class=\"ds-link\">Патерни</a><a class=\"ds-cta\">Визначити патерн</a></nav>",
+      "css": ".ds-nav{display:flex;align-items:center;gap:8px;background:#171310;padding:12px 20px;font-family:'Golos Text',system-ui,sans-serif}.ds-logo{font-family:Rubik,sans-serif;font-weight:800;font-size:24px;color:#ffb347;margin-right:auto}.ds-link{color:rgba(244,234,217,.6);font-weight:600;padding:8px 12px}.ds-link:hover,.ds-on{color:#f4ead9}.ds-cta{background:#ff7a1a;color:#171310;font-weight:600;padding:8px 16px;border-radius:9999px}"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Coal surface with a smoke hairline; no shadow.",
+      "html": "<div class=\"ds-card\"><h3>Класичний бій</h3><p>Найкращий збіг для вашого треку</p></div>",
+      "css": ".ds-card{background:#2a221c;color:#f4ead9;border:1px solid rgba(244,234,217,.06);border-radius:16px;padding:24px;font-family:'Golos Text',system-ui,sans-serif}.ds-card h3{font-family:Rubik,sans-serif;font-weight:700;font-size:22px;margin:0 0 6px}.ds-card p{color:rgba(244,234,217,.7);margin:0}"
+    },
+    {
+      "name": "Strum Step Row",
+      "kind": "custom",
+      "refersTo": "step-cell",
+      "description": "Pattern notation: equal cells, ember down, amber up, muted rest.",
+      "html": "<div class=\"ds-steps\"><span class=\"d\">↓</span><span class=\"r\">·</span><span class=\"d\">↓</span><span class=\"u\">↑</span><span class=\"r\">·</span><span class=\"u\">↑</span><span class=\"d\">↓</span><span class=\"u\">↑</span></div>",
+      "css": ".ds-steps{display:flex;gap:6px}.ds-steps span{width:40px;height:56px;border-radius:8px;background:#3a2f26;border:1px solid rgba(244,234,217,.1);display:flex;align-items:center;justify-content:center;font:700 24px Rubik,sans-serif}.ds-steps .d{color:#ff7a1a}.ds-steps .u{color:#ffb347}.ds-steps .r{color:rgba(244,234,217,.25)}"
+    },
+    {
+      "name": "Closing CTA Band",
+      "kind": "custom",
+      "refersTo": "cta-band",
+      "description": "The single full-ember surface on the home page.",
+      "html": "<div class=\"ds-band\"><h2>Спробуйте зі своєю піснею</h2><a>Визначити патерн</a></div>",
+      "css": ".ds-band{background:#ff7a1a;color:#171310;border-radius:24px;padding:48px;display:flex;align-items:center;justify-content:space-between;gap:24px}.ds-band h2{font:800 36px/1.1 Rubik,sans-serif;margin:0}.ds-band a{background:#171310;color:#f4ead9;padding:14px 26px;border-radius:9999px;font-weight:600}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Ватра — the campfire stage",
+    "overview": "A warm, low-lit stage where a beginner guitarist learns how to strum a song. Night ground, coal surfaces, and ember light only where sound becomes playing. The signature is the pipeline stage: waveform → guitar → strum, on one 4-second clock.",
+    "keyCharacteristics": ["Warm night ground, never blue-black", "Ember only for sound and action", "Rubik display over Golos Text", "Flat tonal depth, no card shadows", "Motion that explains the pipeline"],
+    "rules": [
+      { "name": "The Ember Rule", "body": "Ember marks what acts or what sounds; it never decorates.", "section": "colors" },
+      { "name": "No Kickers", "body": "Headings carry themselves; sequence numbers sit inline in the heading.", "section": "typography" },
+      { "name": "Flat Firelight", "body": "Depth is tonal; the only glow is the stage's guitar lane.", "section": "elevation" }
+    ],
+    "dos": ["Keep ember for downstrokes, the primary action and the active stage", "Label demonstration content as an example", "Tie every animation to what GPR does"],
+    "donts": ["Don't add eyebrows above headings", "Don't build rows of same-size cards", "Don't use gradient text, glass or decorative glow", "Don't use pure white text or blue-black grounds"]
+  }
+}

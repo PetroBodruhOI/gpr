@@ -33,10 +33,20 @@ describe("ProgressBar", () => {
     expect(screen.getByText("50%")).toBeInTheDocument();
   });
 
-  it("sets the bar width via inline style", () => {
+  it("exposes progress to assistive tech and scales the bar", () => {
     const { container } = render(<ProgressBar progress={65} message="" />);
-    const bar = container.querySelector("[style]");
-    expect(bar).toBeTruthy();
-    expect((bar as HTMLElement).style.width).toBe("65%");
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "65");
+    const fill = container.querySelector("[style]") as HTMLElement;
+    expect(fill.style.transform).toBe("scaleX(0.65)");
+  });
+
+  it("marks finished stages and highlights the current one", () => {
+    render(<ProgressBar progress={60} message="" />);
+    const items = screen.getAllByRole("listitem");
+    expect(items.map((li) => li.textContent)).toEqual([
+      "Виділення гітари", "Аналіз ритму", "Підбір патерну",
+    ]);
+    expect(items[0].querySelector("svg")).toBeTruthy();   // done → check
+    expect(items[1].querySelector("svg")).toBeNull();     // active → dot
   });
 });
