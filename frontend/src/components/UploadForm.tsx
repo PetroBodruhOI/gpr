@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { predictFile } from "../api/client";
+import { AlertIcon, ArrowRightIcon, CheckIcon, UploadIcon, XIcon } from "./icons";
 
 interface Props {
   onStart: (taskId: string) => void;
@@ -8,29 +9,29 @@ interface Props {
 // Keep in sync with MAX_UPLOAD_MB on the backend.
 const MAX_UPLOAD_MB = 100;
 
+const ALLOWED_TYPES = [
+  "audio/wav",
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/ogg",
+  "audio/flac",
+  "audio/mp4",       // iPhone .m4a
+  "audio/x-m4a",     // iPhone .m4a (альтернативний MIME)
+  "audio/aac",
+  "video/mp4",       // iPhone HEVC відео
+  "video/quicktime", // iPhone .mov
+];
+
 export default function UploadForm({ onStart }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState("");
 
-  const allowed = [
-    "audio/wav",
-    "audio/mpeg",
-    "audio/mp3",
-    "audio/ogg",
-    "audio/flac",
-    "audio/mp4",       // iPhone .m4a
-    "audio/x-m4a",    // iPhone .m4a (альтернативний MIME)
-    "audio/aac",
-    "video/mp4",       // iPhone HEVC відео
-    "video/quicktime", // iPhone .mov
-  ];
-
   const validateFile = (f: File | null): boolean => {
     if (!f) return false;
 
-    if (!allowed.includes(f.type)) {
+    if (!ALLOWED_TYPES.includes(f.type)) {
       setError("Підтримуються аудіофайли MP3, WAV, OGG, FLAC, M4A та відео MP4, MOV");
       setFile(null);
       return false;
@@ -54,9 +55,7 @@ export default function UploadForm({ onStart }: Props) {
 
   const submit = async () => {
     if (!file) return;
-
     setBusy(true);
-
     try {
       const taskId = await predictFile(file);
       onStart(taskId);
@@ -70,7 +69,6 @@ export default function UploadForm({ onStart }: Props) {
   const handleDragOver = (e: React.DragEvent<HTMLLabelElement>) => {
     e.preventDefault();
     e.stopPropagation();
-
     if (!busy) setDragOver(true);
   };
 
@@ -83,199 +81,93 @@ export default function UploadForm({ onStart }: Props) {
   const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
     e.preventDefault();
     e.stopPropagation();
-
     setDragOver(false);
-
     if (busy) return;
-
-    const dropped = e.dataTransfer.files?.[0];
-
-    validateFile(dropped ?? null);
+    validateFile(e.dataTransfer.files?.[0] ?? null);
   };
 
   return (
-    <div className="space-y-5">
-      <div>
-        <label className="block text-xs font-semibold text-white/50 mb-2 uppercase tracking-wider">
-          Аудіофайл
-        </label>
-
-        <label
-          onDragOver={handleDragOver}
-          onDragEnter={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          className="group flex flex-col items-center justify-center w-full h-44 rounded-lg cursor-pointer transition-all duration-200 relative overflow-hidden"
-          style={{
-            background: dragOver
-              ? "rgba(16, 185, 129, 0.1)"
-              : "rgba(10, 20, 36, 0.4)",
-            border: dragOver
-              ? "1.5px dashed rgba(16, 185, 129, 0.6)"
-              : "1.5px dashed rgba(255, 255, 255, 0.15)",
-          }}
+    <div className="space-y-4">
+      <label
+        onDragOver={handleDragOver}
+        onDragEnter={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        data-drag={dragOver || undefined}
+        className="group relative flex flex-col items-center justify-center w-full min-h-44 px-4 py-8 rounded-lg
+                   cursor-pointer text-center border-[1.5px] border-dashed border-white/15 bg-ink/50
+                   transition-colors duration-150
+                   hover:border-glow/40 hover:bg-glow/[0.04]
+                   data-[drag]:border-glow/70 data-[drag]:bg-glow/10
+                   has-[:focus-visible]:outline has-[:focus-visible]:outline-2
+                   has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent"
+      >
+        <span
+          className="w-12 h-12 mb-3 rounded-lg flex items-center justify-center border border-glow/30
+                     bg-glow/10 text-glow transition-transform duration-200 ease-out
+                     group-data-[drag]:scale-110"
         >
-          <div
-            className={`absolute inset-0 bg-emerald-500/5 transition-opacity ${
-              dragOver
-                ? "opacity-100"
-                : "opacity-0 group-hover:opacity-100"
-            }`}
-          />
+          <UploadIcon className="w-6 h-6" />
+        </span>
 
-          <div className="relative flex flex-col items-center justify-center pointer-events-none">
-            <div
-              className={`w-12 h-12 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mb-3 transition-all ${
-                dragOver
-                  ? "bg-emerald-500/30 scale-110"
-                  : "group-hover:bg-emerald-500/20"
-              }`}
-            >
-              <svg
-                className="w-6 h-6 text-emerald-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                />
-              </svg>
-            </div>
+        <span className="text-white font-medium mb-1 [overflow-wrap:anywhere]">
+          {dragOver
+            ? "Відпустіть, щоб завантажити"
+            : file
+            ? file.name
+            : "Перетягніть аудіо або відео або натисніть, щоб вибрати"}
+        </span>
+        <span className="text-white/45 text-xs">
+          MP3 · WAV · OGG · FLAC · M4A · MP4 · MOV · до {MAX_UPLOAD_MB} МБ
+        </span>
 
-            <p className="text-white font-medium mb-1">
-              {dragOver
-                ? "Відпустіть, щоб завантажити"
-                : file
-                ? file.name
-                : "Перетягніть аудіо або відео або натисніть, щоб вибрати"}
-            </p>
-
-            <p className="text-white/40 text-xs">
-              MP3 · WAV · OGG · FLAC · M4A · MP4 · MOV · до {MAX_UPLOAD_MB} МБ
-            </p>
-          </div>
-
-          <input
-            type="file"
-            accept=".mp3,.wav,.ogg,.flac,.m4a,.aac,.mp4,.mov,audio/*,video/*"
-            disabled={busy}
-            className="hidden"
-            onChange={(e) => {
-              const selected = e.target.files?.[0] ?? null;
-              validateFile(selected);
-            }}
-          />
-        </label>
-      </div>
+        <input
+          type="file"
+          accept=".mp3,.wav,.ogg,.flac,.m4a,.aac,.mp4,.mov,audio/*,video/*"
+          disabled={busy}
+          className="sr-only"
+          onChange={(e) => validateFile(e.target.files?.[0] ?? null)}
+        />
+      </label>
 
       {error && (
-        <div
-          className="p-3 rounded-xl text-sm text-red-300"
-          style={{
-            background: "rgba(239, 68, 68, 0.1)",
-            border: "1px solid rgba(239, 68, 68, 0.3)",
-          }}
-        >
+        <div role="alert" className="flex items-start gap-2.5 p-3 rounded-lg text-sm text-red-200 bg-red-500/10 border border-red-500/30">
+          <AlertIcon className="w-4 h-4 mt-0.5 flex-shrink-0" />
           {error}
         </div>
       )}
 
       {file && (
-        <div
-          className="p-4 rounded-xl flex items-center gap-3"
-          style={{
-            background: "rgba(34, 197, 94, 0.1)",
-            border: "1px solid rgba(34, 197, 94, 0.3)",
-          }}
-        >
-          <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
-            <svg
-              className="w-4 h-4 text-green-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2.5}
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-          </div>
-
+        <div data-file-card className="flex items-center gap-3 p-3 rounded-lg bg-glow/10 border border-glow/30">
+          <span className="w-8 h-8 rounded-full bg-glow/20 text-glow flex items-center justify-center flex-shrink-0">
+            <CheckIcon />
+          </span>
           <div className="min-w-0 flex-1">
-            <p className="text-green-300 text-sm font-semibold">
-              Файл готовий
-            </p>
-
-            <p className="text-white/60 text-sm truncate">
-              {file.name}
-            </p>
+            <p className="text-glow text-sm font-semibold">Файл готовий</p>
+            <p className="text-white/60 text-sm truncate">{file.name}</p>
           </div>
-
           <button
             type="button"
             onClick={removeFile}
-            className="text-red-300 hover:text-red-200 transition"
+            aria-label="Прибрати файл"
+            className="btn w-9 h-9 text-white/50 hover:text-red-300 hover:bg-white/5"
           >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2.5}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+            <XIcon className="w-5 h-5" />
           </button>
         </div>
       )}
 
-      <button
-        onClick={submit}
-        disabled={!file || busy}
-        className="w-full btn-primary"
-      >
+      <button onClick={submit} disabled={!file || busy} className="btn-primary w-full">
         {busy ? (
-          <span className="flex items-center justify-center gap-2">
-            <span className="w-1.5 h-1.5 bg-slate-900 rounded-full animate-pulse" />
-            <span
-              className="w-1.5 h-1.5 bg-slate-900 rounded-full animate-pulse"
-              style={{ animationDelay: "0.2s" }}
-            />
-            <span
-              className="w-1.5 h-1.5 bg-slate-900 rounded-full animate-pulse"
-              style={{ animationDelay: "0.4s" }}
-            />
+          <>
+            <span className="w-4 h-4 rounded-full border-2 border-ink/30 border-t-ink animate-spin" />
             Обробка
-          </span>
+          </>
         ) : (
-          <span className="flex items-center justify-center gap-2">
+          <>
             Підібрати патерн
-
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2.5}
-                d="M17 8l4 4m0 0l-4 4m4-4H3"
-              />
-            </svg>
-          </span>
+            <ArrowRightIcon />
+          </>
         )}
       </button>
     </div>

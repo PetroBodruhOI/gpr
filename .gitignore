@@ -41,3 +41,7 @@ htmlcov/
 coverage.xml
 .vercel
 .env*
+
+# impeccable working artifacts (screenshots, decision sketches)
+frontend/.impeccable/review/
+frontend/.impeccable/mocks/

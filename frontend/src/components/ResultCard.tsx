@@ -1,12 +1,16 @@
 import { useState } from "react";
 import { PredictResult, submitFeedback } from "../api/client";
-import { PATTERNS } from "../data/patterns";
+import { colorFor, PATTERNS } from "../data/patterns";
 import PatternDisplay, { PatternLegend } from "./PatternDisplay";
 import ChunkDistributionChart from "./ChunkDistributionChart";
+import {
+  ArrowLeftIcon, CheckIcon, ChevronDownIcon, ChevronUpIcon, ThumbDownIcon, ThumbUpIcon,
+} from "./icons";
 
 interface Props {
   result: PredictResult;
   taskId: string;
+  onReset?: () => void;
 }
 
 function FeedbackPanel({ taskId }: { taskId: string }) {
@@ -26,113 +30,94 @@ function FeedbackPanel({ taskId }: { taskId: string }) {
     }
   };
 
-  if (submitted) {
-    return (
-      <div className="card mt-6 text-center">
-        <div className="flex items-center justify-center gap-2 text-emerald-300 mb-1">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-          </svg>
-          <span className="text-sm font-semibold">Дякуємо за відгук!</span>
-        </div>
-        <p className="text-white/50 text-xs">Ваша оцінка допомагає нам покращити модель.</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="card mt-6 text-center">
-      <h3 className="text-white font-semibold text-base mb-1">
-        Допоможіть нам покращити модель
-      </h3>
-      <p className="text-white/60 text-sm mb-4">
-        Чи вважаєте, що рекомендація була правильною?
-      </p>
-      <div className="flex gap-3 justify-center flex-wrap">
-        <button
-          onClick={() => send("good")}
-          disabled={busy}
-          className="px-5 py-2 rounded-lg font-medium transition-all duration-200 disabled:opacity-50"
-          style={{
-            background: "rgba(16, 185, 129, 0.15)",
-            border: "1px solid rgba(16, 185, 129, 0.4)",
-            color: "#6ee7b7",
-          }}
-        >
-          👍 Так, підходить
-        </button>
-        <button
-          onClick={() => send("bad")}
-          disabled={busy}
-          className="px-5 py-2 rounded-lg font-medium transition-all duration-200 disabled:opacity-50"
-          style={{
-            background: "rgba(239, 68, 68, 0.12)",
-            border: "1px solid rgba(239, 68, 68, 0.4)",
-            color: "#fca5a5",
-          }}
-        >
-          👎 Ні, не те
-        </button>
-      </div>
+    <div className="card text-center" aria-live="polite">
+      {submitted ? (
+        <>
+          <p className="flex items-center justify-center gap-2 text-glow font-semibold">
+            <CheckIcon className="w-5 h-5" />
+            Дякуємо за відгук!
+          </p>
+          <p className="mt-1 text-white/50 text-sm">Ваша оцінка допомагає нам покращити модель.</p>
+        </>
+      ) : (
+        <>
+          <h3 className="section-title">Допоможіть нам покращити модель</h3>
+          <p className="mt-1 mb-4 text-white/60 text-sm">
+            Чи вважаєте, що рекомендація була правильною?
+          </p>
+          <div className="flex gap-3 justify-center flex-wrap">
+            <button
+              onClick={() => send("good")}
+              disabled={busy}
+              className="btn px-5 py-2.5 text-glow bg-glow/10 border border-glow/40
+                         hover:bg-glow/20 disabled:opacity-50"
+            >
+              <ThumbUpIcon />
+              Так, підходить
+            </button>
+            <button
+              onClick={() => send("bad")}
+              disabled={busy}
+              className="btn px-5 py-2.5 text-red-200 bg-red-500/10 border border-red-500/40
+                         hover:bg-red-500/20 disabled:opacity-50"
+            >
+              <ThumbDownIcon />
+              Ні, не те
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
 const TIMELINE_PREVIEW_COUNT = 2;
 
-function TimelineTable({
-  chunks,
-  total,
-}: {
-  chunks: PredictResult["chunks"];
-  total: number;
-}) {
+function TimelineTable({ chunks, total }: { chunks: PredictResult["chunks"]; total: number }) {
   const [expanded, setExpanded] = useState(false);
   const canCollapse = chunks.length > TIMELINE_PREVIEW_COUNT;
-  const visible = expanded || !canCollapse
-    ? chunks
-    : chunks.slice(0, TIMELINE_PREVIEW_COUNT);
+  const visible = expanded || !canCollapse ? chunks : chunks.slice(0, TIMELINE_PREVIEW_COUNT);
   const hiddenCount = chunks.length - TIMELINE_PREVIEW_COUNT;
+
+  const th = "px-3 sm:px-4 py-2.5 text-left font-medium text-white/50 text-xs";
+  const td = "px-3 sm:px-4 py-3";
 
   return (
     <div className="card">
-      <h3 className="text-lg font-semibold text-white mb-5 flex items-center gap-2">
-        <span className="w-1 h-5 bg-emerald-500 rounded-full" />
+      <h3 className="section-title mb-4">
         Часова шкала
-        <span className="text-white/40 text-sm font-normal ml-2">
-          {total} сегментів
-        </span>
+        <span className="ml-2 text-white/40 text-sm font-normal">{total} сегментів</span>
       </h3>
-      <div className="overflow-x-auto rounded-lg border border-white/5">
-        <table className="w-full text-xs sm:text-sm">
+      <div className="overflow-x-auto rounded-lg border border-white/[0.06]">
+        <table className="w-full text-sm tabular-nums">
           <thead>
-            <tr className="bg-slate-900/40 border-b border-white/5">
-              <th className="hidden sm:table-cell px-4 py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">#</th>
-              <th className="px-2 sm:px-4 py-2 sm:py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">Час</th>
-              <th className="px-2 sm:px-4 py-2 sm:py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">Патерн</th>
-              <th className="px-2 sm:px-4 py-2 sm:py-3 text-left font-medium text-white/50 uppercase text-xs tracking-wider">Впевн.</th>
+            <tr className="bg-ink/50 border-b border-white/[0.06]">
+              <th className={`${th} hidden sm:table-cell w-12`}>#</th>
+              <th className={th}>Час</th>
+              <th className={th}>Патерн</th>
+              <th className={`${th} text-right`}>
+                <span className="hidden sm:inline">Впевненість</span>
+                <span className="sm:hidden" aria-label="Впевненість">%</span>
+              </th>
             </tr>
           </thead>
           <tbody>
             {visible.map((c) => (
-              <tr
-                key={c.chunk_idx}
-                className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
-              >
-                <td className="hidden sm:table-cell px-4 py-3 text-white/40 font-mono">{c.chunk_idx}</td>
-                <td className="px-2 sm:px-4 py-2 sm:py-3 text-white/70 font-mono">
-                  {c.time_start.toFixed(1)}–{c.time_end.toFixed(1)}с
+              <tr key={c.chunk_idx} className="border-b border-white/[0.05] last:border-0">
+                <td className={`${td} hidden sm:table-cell text-white/40`}>{c.chunk_idx}</td>
+                <td className={`${td} text-white/70 whitespace-nowrap`}>
+                  {c.time_start.toFixed(1)}–{c.time_end.toFixed(1)} с
                 </td>
-                <td className="px-2 sm:px-4 py-2 sm:py-3 font-medium text-white">{c.label}</td>
-                <td className="px-2 sm:px-4 py-2 sm:py-3">
-                  <span className="inline-block px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md text-xs font-semibold"
-                        style={{
-                          background: "rgba(234, 179, 8, 0.12)",
-                          color: "#fde047",
-                          border: "1px solid rgba(234, 179, 8, 0.25)"
-                        }}>
-                    {(c.confidence * 100).toFixed(1)}%
+                <td className={td}>
+                  <span className="flex items-center gap-2 min-w-0">
+                    <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: colorFor(c.label) }} />
+                    <span className="text-white font-medium truncate">{PATTERNS[c.label]?.name ?? c.label}</span>
+                    <span className="hidden sm:inline text-white/40 font-mono text-xs">{c.label}</span>
                   </span>
+                </td>
+                <td className={`${td} text-right text-accent font-semibold`}>
+                  {(c.confidence * 100).toFixed(1)}%
                 </td>
               </tr>
             ))}
@@ -142,29 +127,9 @@ function TimelineTable({
 
       {canCollapse && (
         <div className="mt-4 flex justify-center">
-          <button
-            onClick={() => setExpanded((v) => !v)}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-white/70 hover:text-white transition-all duration-200 flex items-center gap-2"
-            style={{
-              background: "rgba(255, 255, 255, 0.04)",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
-            }}
-          >
-            {expanded ? (
-              <>
-                Показати менше
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                </svg>
-              </>
-            ) : (
-              <>
-                Показати більше ({hiddenCount})
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </>
-            )}
+          <button onClick={() => setExpanded((v) => !v)} className="btn-secondary text-sm">
+            {expanded ? "Показати менше" : `Показати більше (${hiddenCount})`}
+            {expanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
           </button>
         </div>
       )}
@@ -197,105 +162,86 @@ export function pickRecommendations(
   return candidates.length > 0 ? candidates : [sorted[0]];
 }
 
-function PatternCard({
-  label,
-  prob,
-  emphasis,
-}: {
-  label: string;
-  prob: number;
-  emphasis: "primary" | "secondary";
-}) {
+function PatternCard({ label, prob, primary }: { label: string; prob: number; primary: boolean }) {
   const pattern = PATTERNS[label];
-  const pct = prob * 100;
-  const isPrimary = emphasis === "primary";
 
   return (
-    <div
-      className={isPrimary ? "card-glow" : "card"}
-      style={isPrimary ? undefined : { background: "rgba(10, 20, 36, 0.5)" }}
-    >
-      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mb-3">
-        <div className={isPrimary ? "text-2xl sm:text-3xl md:text-4xl font-bold text-white" : "text-xl sm:text-2xl font-bold text-white"}>
+    <div className={primary ? "card-featured" : "card"}>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h3 className={`font-bold text-white tracking-tight ${primary ? "text-2xl sm:text-3xl" : "text-xl"}`}>
           {pattern ? pattern.name : label}
-        </div>
-        {pattern && (
-          <span className="text-sm text-yellow-300/70 font-mono">{pattern.label}</span>
-        )}
-        <span className="ml-auto flex items-baseline gap-1">
-          <span className="text-xl font-semibold text-yellow-300">{pct.toFixed(1)}%</span>
+        </h3>
+        {pattern && <span className="text-sm text-white/45 font-mono">{pattern.label}</span>}
+        <span className="ml-auto flex items-baseline gap-1.5">
+          <span className={`font-semibold text-accent tabular-nums ${primary ? "text-2xl" : "text-xl"}`}>
+            {(prob * 100).toFixed(1)}%
+          </span>
           <span className="text-white/50 text-sm">впевненість</span>
         </span>
       </div>
 
-      {pattern && (
-        <p className="text-white/50 text-xs font-mono mb-4">{pattern.description}</p>
-      )}
-
       {pattern ? (
         <>
-          <div className="py-2 overflow-x-auto">
-            <PatternDisplay pattern={pattern} size={isPrimary ? "lg" : "md"} />
+          <p className="mt-1 text-white/45 text-xs font-mono tracking-wide">{pattern.description}</p>
+          <div className="mt-5 py-1 overflow-x-auto">
+            <PatternDisplay pattern={pattern} size={primary ? "lg" : "md"} />
           </div>
-          <div className="mt-3">
-            <PatternLegend kind={pattern.kind === "strum" ? "strum" : "arp"} />
+          <div className="mt-4 pt-4 border-t border-white/[0.06]">
+            <PatternLegend kind={pattern.kind} />
           </div>
         </>
       ) : (
-        <p className="text-white/40 text-sm italic">
-          Опис патерну для «{label}» не знайдено
-        </p>
+        <p className="mt-3 text-white/45 text-sm">Опис патерну для «{label}» не знайдено</p>
       )}
     </div>
   );
 }
 
-export default function ResultCard({ result, taskId }: Props) {
+export default function ResultCard({ result, taskId, onReset }: Props) {
   const recommendations = pickRecommendations(result.mean_probs);
   const isHighConf = result.final_conf >= HIGH_CONFIDENCE_THRESHOLD;
 
+  // Each block enters once, staggered: header, cards, chart, table, feedback.
+  let i = 0;
+  const enter = () => ({ className: "enter", style: { "--i": i++ } as React.CSSProperties });
+
   return (
-    <div className="space-y-6 mt-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-lg bg-emerald-500/15 flex items-center justify-center border border-emerald-500/30">
-            <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <div>
-            <h2 className={`text-xl font-semibold ${isHighConf ? "text-white" : "text-yellow-300"}`}>
+    <div className="space-y-5">
+      <div {...enter()} className="enter flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="w-10 h-10 flex-shrink-0 rounded-lg bg-glow/15 border border-glow/30 text-glow flex items-center justify-center">
+            <CheckIcon className="w-5 h-5" />
+          </span>
+          <div className="min-w-0">
+            <h2 className={`text-xl font-semibold ${isHighConf ? "text-white" : "text-accent"}`}>
               {isHighConf ? "Рекомендований патерн" : "Можливі патерни"}
             </h2>
-            <p className="text-white/50 text-sm">
+            <p className="text-white/55 text-sm">
               {isHighConf
                 ? "Найкращий збіг для вашого треку"
-                : `Модель не впевнена — показуємо топ-${recommendations.length} варіантів`}
+                : recommendations.length > 1
+                ? `Модель не впевнена — показуємо топ-${recommendations.length} варіанти`
+                : "Модель не впевнена — це найімовірніший варіант"}
             </p>
           </div>
         </div>
+        {onReset && (
+          <button onClick={onReset} className="btn-secondary hidden sm:inline-flex text-sm flex-shrink-0">
+            <ArrowLeftIcon />
+            Інший трек
+          </button>
+        )}
       </div>
 
-      {/* Recommendations */}
-      <div className="space-y-4">
-        {recommendations.map((r, idx) => (
-          <PatternCard
-            key={r.label}
-            label={r.label}
-            prob={r.prob}
-            emphasis={idx === 0 ? "primary" : "secondary"}
-          />
-        ))}
-      </div>
+      {recommendations.map((r, idx) => (
+        <div key={r.label} {...enter()}>
+          <PatternCard label={r.label} prob={r.prob} primary={idx === 0} />
+        </div>
+      ))}
 
-      {/* Chunk distribution chart */}
-      <ChunkDistributionChart chunks={result.chunks} />
-
-      {/* Timeline table */}
-      <TimelineTable chunks={result.chunks} total={result.n_chunks} />
-
-      <FeedbackPanel taskId={taskId} />
+      <div {...enter()}><ChunkDistributionChart chunks={result.chunks} /></div>
+      <div {...enter()}><TimelineTable chunks={result.chunks} total={result.n_chunks} /></div>
+      <div {...enter()}><FeedbackPanel taskId={taskId} /></div>
     </div>
   );
 }

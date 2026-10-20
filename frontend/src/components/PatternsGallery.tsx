@@ -1,65 +1,47 @@
-import { PATTERNS, PATTERN_ORDER } from "../data/patterns";
+import { Pattern, PATTERNS, PATTERN_ORDER } from "../data/patterns";
 import PatternDisplay, { PatternLegend } from "./PatternDisplay";
 
-export default function PatternsGallery() {
-  const strumPatterns = PATTERN_ORDER
-    .map((k) => PATTERNS[k])
-    .filter((p) => p && p.kind === "strum");
-  const arpPatterns = PATTERN_ORDER
-    .map((k) => PATTERNS[k])
-    .filter((p) => p && p.kind === "arp");
-
+function PatternTile({ pattern }: { pattern: Pattern }) {
   return (
-    <div className="space-y-8">
-      {/* Strumming section */}
-      <section>
-        <div className="flex flex-wrap items-baseline justify-between gap-3 mb-4">
-          <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-            <span className="w-1 h-5 bg-yellow-400 rounded-full" />
-            Бої
-          </h2>
-          <PatternLegend kind="strum" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {strumPatterns.map((p) => (
-            <div key={p.label} className="card">
-              <div className="flex items-baseline justify-between mb-3">
-                <h3 className="font-semibold text-white">{p.name}</h3>
-                <span className="text-xs text-yellow-300/80 font-mono">{p.label}</span>
-              </div>
-              <div className="py-2 overflow-x-auto">
-                <PatternDisplay pattern={p} size="md" />
-              </div>
-              <p className="mt-3 text-xs text-white/50 font-mono">{p.description}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+    <div className="card flex flex-col">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="font-semibold text-white">{pattern.name}</h3>
+        <span className="text-xs text-white/45 font-mono">{pattern.label}</span>
+      </div>
+      <div className="my-5 py-1 overflow-x-auto">
+        <PatternDisplay pattern={pattern} size="md" />
+      </div>
+      <p className="mt-auto text-xs text-white/45 font-mono tracking-wide">{pattern.description}</p>
+    </div>
+  );
+}
 
-      {/* Arpeggio section */}
-      <section>
-        <div className="flex flex-wrap items-baseline justify-between gap-3 mb-4">
-          <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-            <span className="w-1 h-5 bg-emerald-500 rounded-full" />
-            Арпеджіо
-          </h2>
-          <PatternLegend kind="arp" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {arpPatterns.map((p) => (
-            <div key={p.label} className="card">
-              <div className="flex items-baseline justify-between mb-3">
-                <h3 className="font-semibold text-white">{p.name}</h3>
-                <span className="text-xs text-emerald-300/80 font-mono">{p.label}</span>
-              </div>
-              <div className="py-2 overflow-x-auto">
-                <PatternDisplay pattern={p} size="md" />
-              </div>
-              <p className="mt-3 text-xs text-white/50 font-mono">{p.description}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+function Section({ title, kind }: { title: string; kind: Pattern["kind"] }) {
+  const patterns = PATTERN_ORDER.map((k) => PATTERNS[k]).filter((p) => p && p.kind === kind);
+  return (
+    <section>
+      <div className="flex flex-wrap items-baseline justify-between gap-3 mb-4">
+        <h2 className="text-xl font-semibold text-white">{title}</h2>
+        <PatternLegend kind={kind} />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {patterns.map((p) => <PatternTile key={p.label} pattern={p} />)}
+      </div>
+    </section>
+  );
+}
+
+export default function PatternsGallery() {
+  return (
+    <div className="space-y-10">
+      <div>
+        <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">Список патернів</h1>
+        <p className="mt-2 text-white/60 max-w-2xl">
+          Шість патернів, які розпізнає модель: три бої та три арпеджіо.
+        </p>
+      </div>
+      <Section title="Бої" kind="strum" />
+      <Section title="Арпеджіо" kind="arp" />
     </div>
   );
 }

@@ -68,7 +68,7 @@ describe("UploadForm", () => {
     const input = document.querySelector("input[type=file]") as HTMLInputElement;
     await user.upload(input, makeAudioFile());
 
-    const fileCard = screen.getByText("Файл готовий").closest("div[style]")!;
+    const fileCard = screen.getByText("Файл готовий").closest("[data-file-card]")!;
     const removeBtn = within(fileCard as HTMLElement).getByRole("button");
     await user.click(removeBtn);
 

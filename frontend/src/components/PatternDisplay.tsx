@@ -13,9 +13,9 @@ const SIZES = {
 
 function StrumIcon({ kind, sizeClass }: { kind: StrumStep; sizeClass: string }) {
   const base = `${sizeClass} font-bold`;
-  if (kind === "D") return <span className={`${base} text-yellow-300`}>↓</span>;
-  if (kind === "U") return <span className={`${base} text-emerald-400`}>↑</span>;
-  if (kind === "u") return <span className={`${base} text-sm text-emerald-400`}>↑</span>;
+  if (kind === "D") return <span className={`${base} text-accent`}>↓</span>;
+  if (kind === "U") return <span className={`${base} text-glow`}>↑</span>;
+  if (kind === "u") return <span className={`${base} text-sm text-glow`}>↑</span>;
   if (kind === "X") return <span className={`${base} text-red-400`}>×</span>;
   return <span className={`${base} text-white/20`}>·</span>;
 }
@@ -26,14 +26,14 @@ function StrumGrid({ steps, size }: { steps: StrumStep[]; size: "sm" | "md" | "l
   const beatLabels = ["1", "&", "2", "&", "3", "&", "4", "&"];
 
   return (
-    <div className={`flex ${s.gap} justify-center`}>
+    <div className={`flex ${s.gap} w-max mx-auto`}>
       {steps.map((step, i) => (
         <div key={i} className="flex flex-col items-center">
           <div className={`${s.label} text-white/40 mb-1 font-mono`}>
             {beatLabels[i] || ""}
           </div>
           <div className={`${s.cell} flex items-center justify-center rounded-md
-                          bg-slate-900/40 border border-white/10`}>
+                          bg-raised border border-white/10`}>
             <StrumIcon kind={step} sizeClass={s.icon} />
           </div>
         </div>
@@ -50,7 +50,7 @@ function ArpStepBox({ step, size }: { step: ArpStep; size: "sm" | "md" | "lg" })
   if (isEmpty) {
     return (
       <div className={`${s.cell} flex items-center justify-center rounded-md
-                       bg-slate-900/40 border border-white/10`}>
+                       bg-raised border border-white/10`}>
         <span className="text-white/20">·</span>
       </div>
     );
@@ -59,9 +59,9 @@ function ArpStepBox({ step, size }: { step: ArpStep; size: "sm" | "md" | "lg" })
   if (step.isBass) {
     return (
       <div className={`${s.cell} flex flex-col items-center justify-center rounded-md
-                       bg-yellow-400/10 border border-yellow-400/40`}>
-        <span className={`${s.label} text-yellow-300/70 leading-none`}></span>
-        <span className={`${s.icon} font-bold text-yellow-300 leading-none`}>B</span>
+                       bg-accent/10 border border-accent/40`}>
+        <span className={`${s.label} text-accent/70 leading-none`}></span>
+        <span className={`${s.icon} font-bold text-accent leading-none`}>B</span>
       </div>
     );
   }
@@ -69,9 +69,9 @@ function ArpStepBox({ step, size }: { step: ArpStep; size: "sm" | "md" | "lg" })
   if (isChord) {
     return (
       <div className={`${s.cell} flex flex-col items-center justify-center rounded-md
-                       bg-emerald-500/10 border border-emerald-500/40 gap-0.5`}>
+                       bg-glow/10 border border-glow/40 gap-0.5`}>
         {step.strings.map((s_) => (
-          <span key={s_} className={`${SIZES[size].label} font-bold text-emerald-300 leading-none`}>
+          <span key={s_} className={`${SIZES[size].label} font-bold text-glow leading-none`}>
             {s_}
           </span>
         ))}
@@ -82,8 +82,8 @@ function ArpStepBox({ step, size }: { step: ArpStep; size: "sm" | "md" | "lg" })
   // single string
   return (
     <div className={`${s.cell} flex items-center justify-center rounded-md
-                     bg-emerald-500/10 border border-emerald-500/30`}>
-      <span className={`${s.icon} font-bold text-emerald-300`}>{step.strings[0]}</span>
+                     bg-glow/10 border border-glow/30`}>
+      <span className={`${s.icon} font-bold text-glow`}>{step.strings[0]}</span>
     </div>
   );
 }
@@ -91,7 +91,7 @@ function ArpStepBox({ step, size }: { step: ArpStep; size: "sm" | "md" | "lg" })
 function ArpGrid({ steps, size }: { steps: ArpStep[]; size: "sm" | "md" | "lg" }) {
   const s = SIZES[size];
   return (
-    <div className={`flex ${s.gap} justify-center flex-wrap`}>
+    <div className={`flex ${s.gap} w-max mx-auto`}>
       {steps.map((step, i) => (
         <ArpStepBox key={i} step={step} size={size} />
       ))}
@@ -116,8 +116,8 @@ export function PatternLegend({ kind }: { kind: "strum" | "arp" }) {
   if (kind === "strum") {
     return (
       <div className="flex flex-wrap gap-3 text-xs text-white/50">
-        <span><span className="text-yellow-300 font-bold">↓</span> вниз</span>
-        <span><span className="text-emerald-400 font-bold">↑</span> вгору</span>
+        <span><span className="text-accent font-bold">↓</span> вниз</span>
+        <span><span className="text-glow font-bold">↑</span> вгору</span>
         <span><span className="text-red-400 font-bold">×</span> приглушення</span>
         <span><span className="text-white/30">·</span> пауза</span>
       </div>
@@ -125,8 +125,8 @@ export function PatternLegend({ kind }: { kind: "strum" | "arp" }) {
   }
   return (
     <div className="flex flex-wrap gap-3 text-xs text-white/50">
-      <span><span className="text-yellow-300 font-bold">B</span> басова нота</span>
-      <span><span className="text-emerald-300 font-bold">1–6</span> номер струни</span>
+      <span><span className="text-accent font-bold">B</span> басова нота</span>
+      <span><span className="text-glow font-bold">1–6</span> номер струни</span>
       <span>стовпчик = акорд</span>
     </div>
   );
